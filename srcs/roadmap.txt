@@ -1,0 +1,56 @@
+VM Setup
+
+	Hostname: rmedeiro42
+	Domain name: empty
+	Root password: empty
+	Full Name: Ricardo Medeiros
+	Username: rmedeiro
+	Password: 1234
+	Partitions: Guided - use entire disk
+	Partition scheme: All file in one partition
+	Finish partitioning and write changes to disk
+	Write the changes to disk? Yes
+	Scan extra installation media? Yes. And it will show another answer box and click No
+	Debian archive mirror: deb.debian.org
+	Choose software to install: [*] Debian desktop environment
+								[*] KDE Plasma
+								[*] SSH server
+								[*] standard system utilities	
+	Install GRUB bootloader: Yes, and install in /dev/sda
+	FInish the installation: Continue
+
+Debian Setup
+
+	> Install sudo: su -
+	                apt-get update && apt-get upgrade && apt-get install sudo -y
+
+    > Add user to the sudo group: adduser rmedeiro sudo
+	                              getent group sudo (check if it is in sudo group)
+								  sudo reboot (logout/login reboot)
+
+	> Update system: sudo apt update && sudo apt upgrade -y
+
+	> Go to sudoers file: sudo visudo
+	  Edit the line below the root line adding username and the privileges: rmedeiro ALL=(ALL) ALL
+
+	> Install SSH server: sudo apt install -y openssh-server
+                          sudo systemctl enable ssh (activate)
+			              sudo systemctl start ssh
+                          sudo systemctl status ssh (check)
+
+	> Change SSH port 22 to 4242: sudo vim /etc/ssh/sshd_config
+	                              #Port 22 -> Port 4242
+
+								  sudo systemctl restart ssh (reboot)
+								  sudo systemctl status ssh (check)
+
+	> Remote SSH (Vs Code):  Install remote ssh extension
+	                         Click on the 'Open a Remote Window' bottom left button
+							 CLick on 'Connect Current Window To Host'
+							 Add New SSH Host
+							 Write the username and ip (hostname -I): rmedeiro@10.1.234.432 -p 4242
+							 Write the VM user password and press ENTER
+
+    > Install aplications: sudo apt install -y git vim curl wget tree zsh make cmake gcc g++ build-essential ca-certificates gnupg lsb-release apt-transport-https
+                           chsh -s $(which zsh)  (default zsh)
+                           OhMyZsh: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
