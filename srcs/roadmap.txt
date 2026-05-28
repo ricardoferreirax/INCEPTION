@@ -54,3 +54,33 @@ Debian Setup
     > Install aplications: sudo apt install -y git vim curl wget tree zsh make cmake gcc g++ build-essential ca-certificates gnupg lsb-release apt-transport-https
                            chsh -s $(which zsh)  (default zsh)
                            OhMyZsh: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+
+Docker Engine installation
+
+	> Update System: sudo apt-get update && sudo apt-get upgrade -y
+	> Install depedencies: sudo apt-get install ca-certificates curl gnupg -y  (HTTPS certificates and GPG validate keys)
+	> Create keyrings' folder: sudo install -m 0755 -d /etc/apt/keyrings
+	> Add official Docker key: curl -fsSL https://download.docker.com/linux/debian/gpg | \
+                               sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+	> Give permissions: sudo chmod a+r /etc/apt/keyrings/docker.gpg
+	> Add Docker repository: echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+							"$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+							sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+	> Update packages: sudo apt-get update
+	> Install Docker Engine: sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+	> Add user to docker's group: sudo gpasswd -a $USER docker (allow use without sudo)
+	> Apply group without reboot: newgrp docker
+	> Test Docker: docker run hello-world (If it is all perfectly done, appears 'Hello from Docker!')
+	> Check Docker Compose: docker compose version
+	> Active automatically Docker on boot: sudo systemctl enable docker (or use 'sudo systemctl start docker' if docker could not be running)
+	> Check Docker status: systemctl status docker
+
+Enable Access to website via username.42.fr
+
+	> Go to: sudo vim /etc/hosts
+
+	  We gonna see '127.0.0.1 localhost'
+	               '127.0.1.1 debian'
+
+	  And, add '127.0.0.1 rmedeiro.42.fr'
