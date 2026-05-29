@@ -203,3 +203,42 @@ machine's hosts file.
 Otherwise, the browser running on the host will not be able to resolve the domain name.
 
 ==========================================================================================================================================================================
+
+Create the Inception's Project Structure
+
+Inside Vm, we create the directories: mkdir -p secrets
+									  mkdir -p srcs/requirements/mariadb/conf
+									  mkdir -p srcs/requirements/mariadb/tools
+									  mkdir -p srcs/requirements/wordpress/conf
+									  mkdir -p srcs/requirements/wordpress/tools
+									  mkdir -p srcs/requirements/nginx/conf
+									  mkdir -p srcs/requirements/nginx/tools
+
+We have something like that:
+
+									inception/
+									├── Makefile
+									├── secrets/
+									└── srcs/
+										├── .env
+										├── docker-compose.yml
+										└── requirements/
+											├── mariadb/
+											├── wordpress/
+											└── nginx/
+
+==========================================================================================================================================================================
+											
+Create Volumes on Host
+
+The subject requires data in /home/rmedeiro/data.
+
+Create: mkdir -p /home/rmedeiro/data/mariadb
+        mkdir -p /home/rmedeiro/data/wordpress
+
+Check:  ls -la /home/rmedeiro/data
+
+==========================================================================================================================================================================
+
+Create .env 
+
