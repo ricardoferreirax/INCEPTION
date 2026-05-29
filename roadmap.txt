@@ -313,3 +313,22 @@ Even though this is a local VM, it is good practice and matches the security exp
 
 ==========================================================================================================================================================================
 
+Create .gitignore
+
+We create the .gitignore file at the root of the project: vim .gitignore
+
+We add: secrets/
+        srcs/.env
+
+Why ignore secrets/? Because it contains passwords. These files must never be pushed to GitHub.
+
+Why ignore srcs/.env? Because .env may contain machine-specific configuration. Even if we avoid passwords 
+there, it can still contain local values such as: DOMAIN_NAME
+												  database names
+												  usernames
+												  emails
+
+For the evaluator, we can provide an example file separately if needed, such as: srcs/.env.example
+but the real .env should stay local.
+
+==========================================================================================================================================================================
