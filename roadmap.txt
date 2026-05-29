@@ -229,16 +229,87 @@ We have something like that:
 
 ==========================================================================================================================================================================
 											
-Create Volumes on Host
+Create Volumes on the Host Machine
 
-The subject requires data in /home/rmedeiro/data.
+In this project, the VM is considered the host machine for Docker.
+When the subject says /home/login/data on the host machine, it means /home/rmedeiro/data inside the Debian VM, because
+Docker is running inside the VM.
+So, the subject explicitly requires both persistent storages in /home/rmedeiro/data.
 
-Create: mkdir -p /home/rmedeiro/data/mariadb
-        mkdir -p /home/rmedeiro/data/wordpress
+Create the required folders:  mkdir -p /home/rmedeiro/data/mariadb
+                              mkdir -p /home/rmedeiro/data/wordpress
 
-Check:  ls -la /home/rmedeiro/data
+Check if they were created correctly: ls -la /home/rmedeiro/data
+
+Containers are temporary by nature. If a container is removed, its internal filesystem is also removed.
+However, MariaDB and WordPress need persistent data:
+
+MariaDB   → database files
+WordPress → website files
+
+So we store them in Docker named volumes mapped to: /home/rmedeiro/data/mariadb
+                                                    /home/rmedeiro/data/wordpress
+
+This way, if containers are deleted and recreated, the data is not lost.
+That's why we need to create them.
 
 ==========================================================================================================================================================================
 
-Create .env 
+Create the .env file
+
+The .env file stores environment variables used by Docker Compose and by your containers.
+Instead of hardcoding values directly in scripts or in docker-compose.yml, we define them once in .env.
+
+We create the .env file inside the srcs folder: vim srcs/.env
+
+What must be inside .env? For the mandatory part, we need: DOMAIN_NAME
+										                   MYSQL_DATABASE
+										  				   MYSQL_USER
+										                   WP_TITLE
+										                   WP_ADMIN_USER
+										                   WP_ADMIN_EMAIL
+										                   WP_USER
+										                   WP_USER_EMAIL
+
+What should NOT be inside .env? We do not put passwords in .env. We avoid this: MYSQL_PASSWORD=1234
+                                                                                WP_ADMIN_PASSWORD=1234
+
+Passwords should be stored in Docker secrets instead. Why? The subject says credentials, passwords and API keys 
+should not be stored directly in the Git repository. The .env file is useful for configuration, but it is not 
+ideal for secrets.
+
+==========================================================================================================================================================================
+
+Create Docker Secrets
+
+Create the secrets files: echo "root42" > secrets/db_root_password.txt
+						  echo "db42" > secrets/db_password.txt
+						  echo "wp42" > secrets/wp_admin_password.txt
+						  echo "user42" > secrets/wp_user_password.txt
+
+What each secret is for?
+
+db_root_password.txt - Password for the MariaDB root user.
+
+db_password.txt - Password for the normal MariaDB user used by WordPress.
+
+wp_admin_password.txt - Password for the WordPress administrator account.
+
+wp_user_password.txt - Password for the normal WordPress user.
+
+Set Secure Permissions on Secrets:  chmod 600 secrets/*
+
+What does chmod 600 mean? 6 - owner can read and write
+						  0 - group has no permissions
+                          0 - others have no permissions
+
+So only the owner can read and edit the files.
+In practice: -rw------- db_password.txt
+
+So only the owner can read and edit the files.
+
+Why do we use it? Because secrets contain passwords. This prevents other users on the system from reading them.
+Even though this is a local VM, it is good practice and matches the security expectation of the subject.
+
+==========================================================================================================================================================================
 
