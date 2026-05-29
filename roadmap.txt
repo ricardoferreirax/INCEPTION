@@ -175,12 +175,31 @@ Docker Engine installation
 
 ==========================================================================================================================================================================
 
+Configure Local Domain (username.42.fr)
 
-Enable Access to website via username.42.fr
+The Inception subject requires the website to be accessible through: user.42.fr  (e.g: rmedeiro.42.fr)
 
-	> Go to: sudo vim /etc/hosts
+Since this domain does not exist on the internet, we must manually map it to our local machine using the  
+/etc/hosts file.
 
-	  We gonna see '127.0.0.1 localhost'
-	               '127.0.1.1 debian'
+1) Edit the Hosts File - open the hosts file:  sudo vim /etc/hosts
 
-	  And, add '127.0.0.1 rmedeiro.42.fr'
+   You will see something similar to: 127.0.0.1 localhost
+                                      127.0.1.1 debian
+
+2) Add Your 42 Domain - add the following line: 127.0.0.1 rmedeiro.42.fr
+
+3) Check the Configuration: ping rmedeiro.42.fr
+
+   Expected output: PING rmedeiro.42.fr (127.0.0.1)
+
+The /etc/hosts file acts as a local DNS table.
+When the browser requests https://rmedeiro.42.fr the operating system automatically translates: rmedeiro.42.fr → 127.0.0.1
+which points to the local machine.
+This allows NGINX to receive requests for the domain required by the subject without needing a real public DNS record.
+
+If you access the website from your host machine (outside the VM), you must also add 127.0.0.1 rmedeiro.42.fr to the host 
+machine's hosts file.
+Otherwise, the browser running on the host will not be able to resolve the domain name.
+
+==========================================================================================================================================================================
