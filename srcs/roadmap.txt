@@ -2,7 +2,7 @@ VM Setup
 
 	Hostname: rmedeiro42
 	Domain name: empty
-	Root password: empty
+	Root password: root
 	Full Name: Ricardo Medeiros
 	Username: rmedeiro
 	Password: 1234
@@ -13,68 +13,168 @@ VM Setup
 	Scan extra installation media? Yes. And it will show another answer box and click No
 	Debian archive mirror: deb.debian.org
 	Choose software to install: [*] Debian desktop environment
-								[*] KDE Plasma
 								[*] SSH server
 								[*] standard system utilities	
 	Install GRUB bootloader: Yes, and install in /dev/sda
 	FInish the installation: Continue
 
+==========================================================================================================================================================================
+
 Debian Setup
 
-	> Install sudo: su -
-	                apt-get update && apt-get upgrade && apt-get install sudo -y
+	1) Install sudo: 
+	
+	   a) Switch to the root user:  su -
 
-    > Add user to the sudo group: adduser rmedeiro sudo
-	                              getent group sudo (check if it is in sudo group)
-								  sudo reboot (logout/login reboot)
+	   b) Update and upgrade the installed packages:  apt-get update && apt-get upgrade -y
 
-	> Update system: sudo apt update && sudo apt upgrade -y
+	   c) Installs the sudo package, allowing users to execute commands with admnistrative privileges:  
+	      apt-get install sudo -y
 
-	> Go to sudoers file: sudo visudo
-	  Edit the line below the root line adding username and the privileges: rmedeiro ALL=(ALL) ALL
+    2) Add User to the Sudo Group: 
+	
+	   a) Add user to the sudo group:  adduser rmedeiro sudo
 
-	> Install SSH server: sudo apt install -y openssh-server
-                          sudo systemctl enable ssh (activate)
-			              sudo systemctl start ssh
-                          sudo systemctl status ssh (check)
+	      Grants admnistrative privileges to the user through Debian sudo group.
+	
+	   b) Check that the user belongs to the sudo group:   getent group sudo
 
-	> Change SSH port 22 to 4242: sudo vim /etc/ssh/sshd_config
-	                              #Port 22 -> Port 4242
+	   c) Apply the change rebooting the system:  sudo reboot
 
-								  sudo systemctl restart ssh (reboot)
-								  sudo systemctl status ssh (check)
+	3) Update system:  sudo apt update && sudo apt upgrade -y
 
-	> Remote SSH (Vs Code):  Install remote ssh extension
-	                         Click on the 'Open a Remote Window' bottom left button
-							 CLick on 'Connect Current Window To Host'
-							 Add New SSH Host
-							 Write the username and ip (hostname -I): rmedeiro@10.1.234.432 -p 4242
-							 Write the VM user password and press ENTER
+	4) Install Vim: sudo apt install -y vim
 
-    > Install aplications: sudo apt install -y git vim curl wget tree zsh make cmake gcc g++ build-essential ca-certificates gnupg lsb-release apt-transport-https
-                           chsh -s $(which zsh)  (default zsh)
-                           OhMyZsh: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+	5) Go to sudoers file: sudo visudo
+	   Edit the line below the root line adding username and the privileges: rmedeiro ALL=(ALL:ALL) ALL
 
+	6) Install OpenSSH Server: 
+	
+	   a) Install OpenSSH server:  sudo apt install -y openssh-server
+
+	      Allows remote connections to the virtual machine using SSH
+
+	   b) Enable SSH at boot:  sudo systemctl enable ssh
+
+	   c) Start the SSH service:  sudo systemctl start ssh
+
+	   d) Check that SSH is running:  sudo systemctl status ssh
+
+	      Expected status: active (running).
+     
+	7) Change SSH port 22 to 4242: 
+	
+	   a) Open the SSH configuration file:  sudo vim /etc/ssh/sshd_config
+
+	   b) Find: #Port 22 and replace with Port 4242. Save and exit.
+
+	      Changes the SSH listenning port 22 to 4242.
+
+	   c) Restart SSH:  sudo systemctl restart ssh
+
+	   d) Check:  sudo systemctl status ssh (check)
+
+	8) Configure VS COde Remote SSH:  
+
+	   a) Install the Remote - SSH extension in VS Code.
+
+       b) Connect to the VM: Open VS Code and press Ctrl + Shift + P .
+
+	   c) Select: Remote-SSH: Connect to Host... and choose Add New SSH Host...
+
+	   d) Enter: ssh -p 4242 rmedeiro@<VM_IP>  (Example: ssh -p 4242 rmedeiro@192.168.1.120)
+
+          To obtain the VM IP: hostname -I .
+
+	   e) Select the SSH config file, connect to the host and enter the VM password when prompted.
+
+    9) Install aplications: sudo apt install -y git curl wget tree zsh make gcc build-essential ca-certificates gnupg lsb-release apt-transport-https
+                            chsh -s $(which zsh)  (default zsh)
+                            OhMyZsh: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+
+==========================================================================================================================================================================
 
 Docker Engine installation
 
 	> Update System: sudo apt-get update && sudo apt-get upgrade -y
-	> Install depedencies: sudo apt-get install ca-certificates curl gnupg -y  (HTTPS certificates and GPG validate keys)
-	> Create keyrings' folder: sudo install -m 0755 -d /etc/apt/keyrings
-	> Add official Docker key: curl -fsSL https://download.docker.com/linux/debian/gpg | \
-                               sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-	> Give permissions: sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+	> Install Required Depedencies: sudo apt-get install ca-certificates curl gnupg -y
+
+      Installs the packages required to securely download and verify Docker packages: -> ca-certificates: HTTPS certificate validation.
+																					  -> curl: Download files from the internet.
+																					  -> gnupg: Verify package signatures using GPG keys.
+
+	> Create Keyrings Directory: sudo install -m 0755 -d /etc/apt/keyrings
+
+      Creates the directory where trusted repository keys will be stored.
+
+	> Add official Docker key: curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+      Downloads Docker's official signing key and converts it to the binary GPG format required by APT.
+
+	> Set Key Permissions: sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+	  Allows the APT package manager to read the Docker GPG key.
+
 	> Add Docker repository: echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-							"$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-							sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+							"$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+	  Adds Docker's official repository to the APT sources list.
+
 	> Update packages: sudo apt-get update
+
 	> Install Docker Engine: sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-	> Add user to docker's group: sudo gpasswd -a $USER docker (allow use without sudo)
-	> Apply group without reboot: newgrp docker
-	> Test Docker: docker run hello-world (If it is all perfectly done, appears 'Hello from Docker!')
-	> Check Docker Compose: docker compose version
-	> Active automatically Docker on boot: sudo systemctl enable docker (or use 'sudo systemctl start docker' if docker could not be running)
-	> Check Docker status: systemctl status docker
+
+      Installs: -> docker-ce: Docker Engine.
+				-> docker-ce-cli: Docker command-line interface.
+				-> containerd.io: Container runtime.
+				-> docker-buildx-plugin: Advanced image building support.
+				-> docker-compose-plugin: Docker Compose v2 (docker compose).
+
+	> Start Docker Service: sudo systemctl start docker
+
+	  Starts the Docker daemon immediately.
+
+	> Enable Docker at Boot: sudo systemctl enable docker
+
+	  Ensures Docker starts automatically every time the system boots.
+
+	> Add User to Docker Group: sudo gpasswd -a $USER docker
+
+	  Allows the current user to run Docker commands without using sudo.
+
+	> Apply Group Changes: newgrp docker
+
+	  Applies the new group membership without requiring a logout or reboot.
+
+	> Verify Docker Installation: docker run hello-world
+
+	  Downloads and runs Docker's test container. Expected output: Hello from Docker!
+      If this message appears, Docker is installed correctly.
+
+	> Verify Docker Compose: docker compose version
+
+      Checks that Docker Compose v2 is installed and available.
+
+	> Check Docker Service Status: systemctl status docker
+
+	  Displays the current state of the Docker daemon.
+      Expected status: active (running)
+
+    > Display Docker Information: docker info
+
+	  Displays detailed information about: - Docker version
+										   - Storage driver
+										   - Available networks
+										   - Available volumes
+										   - Docker root directory
+										   - Running containers
+
+	  This command is useful to confirm that the Docker daemon is fully operational.
+
+==========================================================================================================================================================================
+
 
 Enable Access to website via username.42.fr
 
