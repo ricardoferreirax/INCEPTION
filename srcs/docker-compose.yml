@@ -3,8 +3,8 @@ services:
 # MariaDB is the database service used by WordPress, and it does not depend on any other service, so it 
 # is the first container that can be started.
 # The image is built from the own Dockerfile located in: ./requirements/mariadb/Dockerfile
-# The database files are stored in a Docker named volume mounted at: /var/lib/mysql
-# The actual persistent data is stored on the VM host at: /home/rmedeiro/data/mariadb
+# The database files are stored in a Docker named volume mounted at: /var/lib/mysql. That path is connected
+# to a Docker named volume. The real persistent data is stored on the VM host at: /home/rmedeiro/data/mariadb
   mariadb:
     build:
       context: ./requirements/mariadb
@@ -14,7 +14,7 @@ services:
     volumes:
       - mariadb:/var/lib/mysql
     networks:
-      - 
+      - inception
     expose:
       - "3306"
     env_file:
@@ -24,12 +24,40 @@ services:
       - db_password
     restart: always
 
+# Docker containers are isolated from each other. To allow the services to communicate, they must be connected
+# to the same Docker network. All containers will belong to this network. This means that a container can reach 
+# another container using its service name. 
+# The subject requires a Docker network that connects all services.
+#
+# Example: WordPress connects to mariadb:3306, where: mariadb -> service name
+#                                                     3306    -> MariaDB port
+#
+# Docker automatically resolves "mariadb" to the IP address of the MariaDB container.
+networks:
 
+  inception:
+    driver: bridge
+
+
+# Volumes are used to persist data outside the container filesystem. As docker containers are temporary, if a 
+# container is deleted, everything stored inside it (its internal filesystem) is deleted as well.
+#
+# MariaDB stores all database files inside /var/lib/mysql. To avoid losing the database when containers are rebuilt 
+# or recreated, this directory is connected to a Docker named volume.
 volumes:
+
   mariadb:
     name: mariadb
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /home/${USER}/data/mariadb
+      device: /home/rmedeiro/data/mariadb
+
+
+secrets:
+
+  db_root_password:
+    file: ../secrets/db_root_password.txt
+  db_password:
+    file: ../secrets/db_password.txt
