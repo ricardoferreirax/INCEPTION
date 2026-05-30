@@ -1,0 +1,35 @@
+services:
+
+# MariaDB is the database service used by WordPress, and it does not depend on any other service, so it 
+# is the first container that can be started.
+# The image is built from the own Dockerfile located in: ./requirements/mariadb/Dockerfile
+# The database files are stored in a Docker named volume mounted at: /var/lib/mysql
+# The actual persistent data is stored on the VM host at: /home/rmedeiro/data/mariadb
+  mariadb:
+    build:
+      context: ./requirements/mariadb
+      dockerfile: Dockerfile
+    container_name: mariadb
+    image: mariadb
+    volumes:
+      - mariadb:/var/lib/mysql
+    networks:
+      - 
+    expose:
+      - "3306"
+    env_file:
+      - .env
+    secrets:
+      - db_root_password
+      - db_password
+    restart: always
+
+
+volumes:
+  mariadb:
+    name: mariadb
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/${USER}/data/mariadb

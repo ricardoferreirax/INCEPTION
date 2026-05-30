@@ -526,3 +526,25 @@ This allows other users or evaluators to understand which variables are required
 
 ==========================================================================================================================================================================
 
+
+Ordem para testar
+
+Primeiro testa só MariaDB:
+
+cd ~/inception/srcs
+docker compose build mariadb
+docker compose up mariadb
+
+Depois:
+
+docker ps
+docker logs mariadb
+
+Quando MariaDB estiver bem, testas WordPress:
+
+docker compose build wordpress
+docker compose up mariadb wordpress
+
+Depois NGINX:
+
+docker compose up --build
