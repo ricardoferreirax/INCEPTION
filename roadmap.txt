@@ -242,27 +242,27 @@ We have something like that:
 											
 Create Volumes on the Host Machine
 
-In this project, the VM is considered the host machine for Docker.
-When the subject says /home/login/data on the host machine, it means /home/rmedeiro/data inside the Debian VM, because
-Docker is running inside the VM.
-So, the subject explicitly requires both persistent storages in /home/rmedeiro/data.
+One of the requirements of the Inception subject is to use Docker named volumes for persistent storage.
+The subject explicitly states that the volume data must be stored inside /home/login/data , where login is our 42 login.
 
-Create the required folders:  mkdir -p /home/rmedeiro/data/mariadb
-                              mkdir -p /home/rmedeiro/data/wordpress
+Where Should These Directories Be Created? Although we are running Debian inside VirtualBox, the Debian VM is considered 
+the Docker host machine because Docker Engine is installed and running inside the VM. Therefore, when the subject says 
+/home/login/data on the host machine it means inside the Debian virtual machine. Docker never sees our physical computer. 
+Docker only sees the Debian VM where it is installed.
 
-Check if they were created correctly: ls -la /home/rmedeiro/data
+Create the folders:  mkdir -p /home/rmedeiro/data/mariadb
+                     mkdir -p /home/rmedeiro/data/wordpress
 
-Containers are temporary by nature. If a container is removed, its internal filesystem is also removed.
-However, MariaDB and WordPress need persistent data:
+Check that they were created successfully:  ls -la /home/rmedeiro/data
 
-MariaDB   → database files
-WordPress → website files
-
-So we store them in Docker named volumes mapped to: /home/rmedeiro/data/mariadb
-                                                    /home/rmedeiro/data/wordpress
-
+Why Do We Need These Directories? Containers are designed to be temporary. If a container is remover, for example,
+docker rm mariadb, it completely removes the container and its internal filesystem.
+Without persistent storage, MariaDB database, WordPress files, uploaded content, users and posts would be lost.
+So, MariaDB and WordPress need persistent data. With volumes the data is preserved.
+The containers can be destroyed and recreated while the date remains safely stored inside /home/rmedeiro/data/mariadb
+and /home/rmedeiro/data/wordpress .
 This way, if containers are deleted and recreated, the data is not lost.
-That's why we need to create them.
+This is exactly why the Inception subject requires persistent volumes.
 
 ==========================================================================================================================================================================
 
@@ -340,20 +340,43 @@ We have to add them to: srcs/.env and secrets/ and create them locally during ev
 
 Create Docker Secrets
 
-Create the secrets files: echo "<DB_ROOT_PASSWORD>" > secrets/db_root_password.txt
-						  echo "<DB_PASSWORD>" > secrets/db_password.txt
-						  echo "<WP_ADMIN_PASSWORD>" > secrets/wp_admin_password.txt
-						  echo "<WP_USER_PASSWORD>" > secrets/wp_user_password.txt
+Docker Secrets are used to store sensitive information such as passwords outside of the source code.
+Instead of hardcoding passwords directly inside we store them in dedicated files and make them available to containers 
+at runtime.
+This improves security and follows the recommendation of the Inception subject, which explicitly states that credentials and 
+sensitive information should not be exposed in the repository.
+
+If it does not already exists, we create the Secrets Directory:  mkdir -p secrets
+
+We create the following secret files: echo "<DB_ROOT_PASSWORD>" > secrets/db_root_password.txt
+						              echo "<DB_PASSWORD>" > secrets/db_password.txt
+						              echo "<WP_ADMIN_PASSWORD>" > secrets/wp_admin_password.txt
+						              echo "<WP_USER_PASSWORD>" > secrets/wp_user_password.txt
 
 What each secret is for?
 
-db_root_password.txt - Password for the MariaDB root user.
+-> db_root_password.txt: Contains the password for the MariaDB root user account.
+-> db_password.txt: Contains the password for the normal MariaDB user used by WordPress.
+                    WordPress uses this account to connect to MariaDB, create tables, read data and write data.
+-> wp_admin_password.txt: Contais the password for the WordPress administrator account.
+-> wp_user_password.txt: Contains Password for the normal WordPress user.
 
-db_password.txt - Password for the normal MariaDB user used by WordPress.
+How Do Docker Secrets Work? How does WordPress access the database password if it is not inside the code?
 
-wp_admin_password.txt - Password for the WordPress administrator account.
+Example: 
 
-wp_user_password.txt - Password for the normal WordPress user.
+secrets/db_password.txt is declared inside:  secrets:
+                                               db_password:
+                                                 file: ../secrets/db_password.txt
+
+and attached to a service:  services:
+                              wordpress:
+                                secrets:
+                                  - db_password
+
+Inside the container Docker automatically creates /run/secrets/db_password .
+The initialization script can then read it DB_PASSWORD=$(cat /run/secrets/db_password) without exposing 
+the password anywhere in the source code.
 
 Set Secure Permissions on Secrets:  chmod 600 secrets/*
 
@@ -364,29 +387,47 @@ What does chmod 600 mean? 6 - owner can read and write
 So only the owner can read and edit the files.
 In practice: -rw------- db_password.txt
 
-So only the owner can read and edit the files.
-
-Why do we use it? Because secrets contain passwords. This prevents other users on the system from reading them.
-Even though this is a local VM, it is good practice and matches the security expectation of the subject.
+Why Do We Use chmod 600? Secrets contain sensitive information. Restricting permissions prevents accidental 
+exposure, unauthorized access and other users on the system reading passwords.
+Even though Inception is developed inside a local VM, using restrictive permissions is considered good practice 
+and reflects real-world server security practices.
 
 ==========================================================================================================================================================================
 
 Create .gitignore
 
-We create the .gitignore file at the root of the project: vim .gitignore
+The .gitignore file tells Git which files and directories should not be tracked by the repository.
+This is especially important for Inception because some files contain passwords, credentials, machine-specific 
+configuration and local development data. These files should never be pushed to GitHub.
 
-We add: secrets/
-        srcs/.env
+At the root of the project, we create the .gitignore: vim .gitignore and add: secrets/ and srcs/.env  .
 
-Why ignore secrets/? Because it contains passwords. These files must never be pushed to GitHub.
+Why Ignore secrets/? The secrets/ directory contains passwords. These files contain sensitive information and must 
+never be committed to the repository. If they are pushed to GitHub, anyone with access to the repository can read 
+the passwords. Ignoring this directory ensures that credentials remain local to the machine where the project is being 
+executed.
 
-Why ignore srcs/.env? Because .env may contain machine-specific configuration. Even if we avoid passwords 
-there, it can still contain local values such as: DOMAIN_NAME
-												  database names
-												  usernames
-												  emails
+Why Ignore srcs/.env? The .env file contains environment variables. Even if passwords are stored in Docker Secrets, the 
+.env file may still contain machine-specific configuration such as DOMAIN_NAME, database names, usernames and email addresses.
+Keeping the file local makes the project easier to configure on different machines.
 
-For the evaluator, we can provide an example file separately if needed, such as: srcs/.env.example
-but the real .env should stay local.
+Important Evaluation Note: The evaluation sheet explicitly states that credentials, API keys and environment variables
+must be configured during the evaluation. For this reason, srcs/.env and secrets/ should not be present in the Git repository.
+Instead, they should be created locally before running the project.
+
+Recommended Practice: A solution is to provide an example file srcs/.env.example , which contains the expected variables without 
+any sensitive values.
+
+Example:
+
+DOMAIN_NAME=<DOMAIN_NAME>
+MYSQL_DATABASE=<MYSQL_DATABASE>
+MYSQL_USER=<MYSQL_USER>
+WP_ADMIN_USER=<WP_ADMIN_USER>
+WP_ADMIN_EMAIL=<WP_ADMIN_EMAIL>
+WP_USER=<WP_USER>
+WP_USER_EMAIL=<WP_USER_EMAIL>
+
+This allows other users or evaluators to understand which variables are required while still keeping the real .env private.
 
 ==========================================================================================================================================================================
