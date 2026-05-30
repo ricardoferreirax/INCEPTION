@@ -186,23 +186,52 @@ Docker Engine installation
 
 ==========================================================================================================================================================================
 
-Configure Local Domain (username.42.fr)
+Configure the Local Domain (username.42.fr)
 
 The Inception subject requires the website to be accessible through: user.42.fr  (e.g: rmedeiro.42.fr)
 
-Since this domain does not exist on the internet, we must manually map it to our local machine using the  
-/etc/hosts file.
+However, this domain does not exist on the public internet. To make the operating system recognize it, we must 
+manually create a local DNS entry using the /etc/hosts file.
+
+What is /etc/hosts ? The /etc/hosts file is a local DNS table.
+Before contacting an external DNS server, Linux checks this file to see if the domain name is already known.
+
+Example:   rmedeiro.42.fr
+                 |
+				 v
+             127.0.0.1
 
 1) Edit the Hosts File - open the hosts file:  sudo vim /etc/hosts
 
-   You will see something similar to: 127.0.0.1 localhost
+   We will see something similar to:  127.0.0.1 localhost
                                       127.0.1.1 debian
 
-2) Add Your 42 Domain - add the following line: 127.0.0.1 rmedeiro.42.fr
+2) Add 42 Domain - add the following line:  127.0.0.1 rmedeiro.42.fr
+   
+   The file should look similar to:  127.0.0.1 localhost
+                                     127.0.0.1 rmedeiro.42.fr
+                                     127.0.1.1 debian
 
-3) Check the Configuration: ping rmedeiro.42.fr
+3) Check the Configuration:  ping rmedeiro.42.fr
 
    Expected output: PING rmedeiro.42.fr (127.0.0.1)
+
+
+How Does It Work? When the browser requests https://rmedeiro.42.fr , Linux performs:  rmedeiro.42.fr
+																						   |
+																						   v
+																					   127.0.0.1
+																					       |
+																						   v
+																					 NGINX Container
+																					       |
+																						   v
+																						WordPress
+																						   |
+																						   v
+																						MariaDB
+
+No public DNS server is involved. Everything happens locally inside the VM.
 
 The /etc/hosts file acts as a local DNS table.
 When the browser requests https://rmedeiro.42.fr the operating system automatically translates: rmedeiro.42.fr → 127.0.0.1
@@ -217,6 +246,7 @@ Otherwise, the browser running on the host will not be able to resolve the domai
 
 Create the Inception's Project Structure
 
+Before writing any Dockerfile, we must create the directory structure required by the subject.
 Inside Vm, we create the directories: mkdir -p secrets
 									  mkdir -p srcs/requirements/mariadb/conf
 									  mkdir -p srcs/requirements/mariadb/tools
@@ -227,16 +257,80 @@ Inside Vm, we create the directories: mkdir -p secrets
 
 We have something like that:
 
-									inception/
-									├── Makefile
-									├── secrets/
-									└── srcs/
-										├── .env
-										├── docker-compose.yml
-										└── requirements/
-											├── mariadb/
-											├── wordpress/
-											└── nginx/
+									inception/ 
+									├── Makefile 
+									├── .gitignore 
+									├── secrets/ 
+									│ 
+									└── srcs/ 
+									    ├── .env 
+										├── docker-compose.yml 
+										│ 
+										└── requirements/ 
+										    │ 
+											├── mariadb/ 
+											│   ├── Dockerfile 
+											│   ├── conf/ 
+											│   └── tools/ 
+											│ 
+											├── wordpress/ 
+											│   ├── Dockerfile 
+											│   ├── conf/ 
+											│   └── tools/ 
+											│ 
+											└── nginx/ 
+											    ├── Dockerfile 
+												├── conf/ 
+												└── tools/
+
+
+Recommended Development Order
+
+Do NOT start by writing everything at once. Build the infrastructure layer by layer.
+
+Step 1 - Create Volumes.
+Step 2 - Create .env.
+Step 3 - Create Docker Secrets.
+Step 4 - Create .gitignore.
+Step 5 - Create docker-compose.yml.
+         Here we start by defining network, volumes and mariadb service. Do not worry about NGINX or WP yet.
+Step 6 - Build MariaDB.
+         Create: requirements/mariadb/Dockerfile
+                 requirements/mariadb/conf/*
+                 requirements/mariadb/tools/*
+         Goals: container starts
+                database is created
+                user is created
+                volume persists data
+         Test MariaDB until it works perfectly.
+Step 7 - Build WordPress + PHP-FPM.
+         Create: requirements/wordpress/Dockerfile
+                 requirements/wordpress/tools/*
+         Goals: PHP-FPM starts
+                WordPress installs automatically
+                connection to MariaDB works
+         Do not start NGINX yet.
+Step 8 - Build NGINX.
+         Create: requirements/nginx/Dockerfile
+                 requirements/nginx/conf/*
+                 requirements/nginx/tools/*
+         Goals: TLSv1.2/TLSv1.3 only
+                self-signed certificate
+                proxy PHP requests to WordPress
+Step 9 - Connect Everything.
+         Check if NGINX, WordPress and MariaDB comunicate through the Docker network.
+Step 10 - Create the Makefile.
+Step 11 - Final Testing.
+          Verify: docker ps
+                  docker images
+                  docker volume ls
+                  docker network ls
+          Open https://rmedeiro.42.fr.
+          Confirm: TLS works
+                   WordPress loads
+                   Database persists after container recreation
+                   Containers restart correctly
+                   No passwords exist inside the repository
 
 ==========================================================================================================================================================================
 											
@@ -431,3 +525,4 @@ WP_USER_EMAIL=<WP_USER_EMAIL>
 This allows other users or evaluators to understand which variables are required while still keeping the real .env private.
 
 ==========================================================================================================================================================================
+
