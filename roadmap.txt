@@ -97,34 +97,38 @@ Debian Setup
 
 Docker Engine installation
 
-	> Update System: sudo apt-get update && sudo apt-get upgrade -y
+	> Update System:  sudo apt-get update && sudo apt-get upgrade -y
 
-	> Install Required Depedencies: sudo apt-get install ca-certificates curl gnupg -y
+	> Install Required Depedencies:  sudo apt-get install ca-certificates curl gnupg -y
 
-      Installs the packages required to securely download and verify Docker packages: -> ca-certificates: HTTPS certificate validation.
-																					  -> curl: Download files from the internet.
-																					  -> gnupg: Verify package signatures using GPG keys.
+      Installs the packages required to securely download and verify Docker packages:  -> ca-certificates: HTTPS certificate validation.
+																					   -> curl: Download files from the internet.
+																					   -> gnupg: Verify package signatures using GPG keys.
 
-	> Create Keyrings Directory: sudo install -m 0755 -d /etc/apt/keyrings
+	> Create Keyrings Directory:  sudo install -m 0755 -d /etc/apt/keyrings
 
       Creates the directory where trusted repository keys will be stored.
 
-	> Add official Docker key: curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+	> Add Docker Official GPG key:  curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
       Downloads Docker's official signing key and converts it to the binary GPG format required by APT.
 
-	> Set Key Permissions: sudo chmod a+r /etc/apt/keyrings/docker.gpg
+	> Set Key Permissions:  sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
 	  Allows the APT package manager to read the Docker GPG key.
 
-	> Add Docker repository: echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-							"$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+	> Add Docker repository:  echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+							  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 	  Adds Docker's official repository to the APT sources list.
 
 	> Update packages: sudo apt-get update
 
-	> Install Docker Engine: sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+	> Check Docker Repository:  apt-cache policy docker-ce
+
+	  Checks that Docker packages will be downloaded from Docker's official repository instead of the default Debian repositories.
+
+	> Install Docker Engine:  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
       Installs: -> docker-ce: Docker Engine.
 				-> docker-ce-cli: Docker command-line interface.
@@ -132,15 +136,15 @@ Docker Engine installation
 				-> docker-buildx-plugin: Advanced image building support.
 				-> docker-compose-plugin: Docker Compose v2 (docker compose).
 
-	> Start Docker Service: sudo systemctl start docker
+	> Start Docker Service:  sudo systemctl start docker
 
 	  Starts the Docker daemon immediately.
 
-	> Enable Docker at Boot: sudo systemctl enable docker
+	> Enable Docker at Boot:  sudo systemctl enable docker
 
 	  Ensures Docker starts automatically every time the system boots.
 
-	> Add User to Docker Group: sudo gpasswd -a $USER docker
+	> Add User to Docker Group:  sudo gpasswd -a $USER docker
 
 	  Allows the current user to run Docker commands without using sudo.
 
@@ -148,16 +152,23 @@ Docker Engine installation
 
 	  Applies the new group membership without requiring a logout or reboot.
 
-	> Verify Docker Installation: docker run hello-world
+	> Check Group Membership:  groups
+
+	  Confirms that the current user belongs to the Docker group.
+	  Expected output:  rmedeiro sudo docker
+
+	> Check Docker Installation:  docker run hello-world
 
 	  Downloads and runs Docker's test container. Expected output: Hello from Docker!
       If this message appears, Docker is installed correctly.
 
-	> Verify Docker Compose: docker compose version
+	> Check Docker Version:  docker --version
+
+	> Check Docker Compose:  docker compose version
 
       Checks that Docker Compose v2 is installed and available.
 
-	> Check Docker Service Status: systemctl status docker
+	> Check Docker Service Status:  systemctl status docker
 
 	  Displays the current state of the Docker daemon.
       Expected status: active (running)
@@ -257,35 +268,82 @@ That's why we need to create them.
 
 Create the .env file
 
-The .env file stores environment variables used by Docker Compose and by your containers.
-Instead of hardcoding values directly in scripts or in docker-compose.yml, we define them once in .env.
+The .env file stores environment variables used by Docker Compose and by the other containers, such as MariaDB, WordPres 
+and NGINX.
 
-We create the .env file inside the srcs folder: vim srcs/.env
+Instead of hardcoding configuration values directly inside docker-compose.yml, Dockerfiles, shell scripts or nginx.conf, we 
+define them once in .env file and reuse them throughout the project.
+This makes the project easier to maintain, to configure and safer from accidental hardcoded values.
 
-What must be inside .env? For the mandatory part, we need: DOMAIN_NAME
-										                   MYSQL_DATABASE
-										  				   MYSQL_USER
-										                   WP_TITLE
-										                   WP_ADMIN_USER
-										                   WP_ADMIN_EMAIL
-										                   WP_USER
-										                   WP_USER_EMAIL
+The .env must be located inside the srcs folder:  vim srcs/.env
 
-What should NOT be inside .env? We do not put passwords in .env. We avoid this: MYSQL_PASSWORD=1234
-                                                                                WP_ADMIN_PASSWORD=1234
+What must be inside .env? For the mandatory part, we need, for example: DOMAIN_NAME
+										                                MYSQL_DATABASE
+										  				                MYSQL_USER
+										                                WP_TITLE
+										                                WP_ADMIN_USER
+										                                WP_ADMIN_EMAIL
+										                                WP_USER
+										                                WP_USER_EMAIL
 
+How Does .env Work? How does, for example, WordPress know the value of MYSQL_USER?
+
+Inside .env, we define the variable MYSQL_USER=wp_user.
+Inside docker-compose.yml we have: 		services:
+  										  wordpress:
+                                            env_file:
+                                              - .env
+
+Docker Compose automatically reads the .env file and loads its variables.															
+When the container starts, Docker Compose exports these variables into the container environment.
+Inside the container echo $MYSQL_USER returns wp_user.
+
+Why Is This Useful? Suppose we change MYSQL_USER=wp_user to MYSQL_USER=my_new_user.
+No Dockerfile, script or configuration file needs to be modified.
+After rebuilding the containers (docker compose up --build) the new value is automatically propagated 
+everywhere.
+
+What should NOT be inside .env? 
+
+Passwords should not be hardcoded inside source files. We avoid: MYSQL_PASSWORD=1234
+																 WP_ADMIN_PASSWORD=1234
+
+Inside Dockerfiles, shell scripts, wp-config.php and Git repository.
+Instead, store sensitive values using Docker secrets: secrets/db_root_password.txt
+													  secrets/db_password.txt
+													  secrets/wp_admin_password.txt
+													  secrets/wp_user_password.txt
+
+and read them at runtime.
+
+What Should NOT Be Hardcoded? Avoid writing configuration values directly inside Dockerfiles, setup scripts,
+wp-config.php, nginx.conf and docker-compose.yml. For example, we avoid: MYSQL_DATABASE=wordpress
+                                                                         MYSQL_USER=wp_user
+
+inside scripts.
+Instead, we read the values from environment variables.
 Passwords should be stored in Docker secrets instead. Why? The subject says credentials, passwords and API keys 
 should not be stored directly in the Git repository. The .env file is useful for configuration, but it is not 
 ideal for secrets.
+
+Why Use Environment Variables? Environment variables allow the same codebase to be reused with different configurations.
+For example: DOMAIN_NAME=rmedeiro.42.fr can be used simultaneously by Docker Compose, NGINX, WordPress and SSL certificate 
+generation without modifying any source file.
+Changing the domain only requires editing one line.
+
+Important Evaluation Note: The evaluation sheet explicitly states that credentials, API keys and environment variables must be 
+configured during the evaluation. For this reason: srcs/.env and secrets/ should not be committed to the Git repository.
+We have to add them to: srcs/.env and secrets/ and create them locally during evaluation.
+
 
 ==========================================================================================================================================================================
 
 Create Docker Secrets
 
-Create the secrets files: echo "root42" > secrets/db_root_password.txt
-						  echo "db42" > secrets/db_password.txt
-						  echo "wp42" > secrets/wp_admin_password.txt
-						  echo "user42" > secrets/wp_user_password.txt
+Create the secrets files: echo "<DB_ROOT_PASSWORD>" > secrets/db_root_password.txt
+						  echo "<DB_PASSWORD>" > secrets/db_password.txt
+						  echo "<WP_ADMIN_PASSWORD>" > secrets/wp_admin_password.txt
+						  echo "<WP_USER_PASSWORD>" > secrets/wp_user_password.txt
 
 What each secret is for?
 
