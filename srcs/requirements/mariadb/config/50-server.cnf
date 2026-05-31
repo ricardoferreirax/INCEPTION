@@ -1,4 +1,23 @@
+
+# The purpose of MariaDB server settings is to: - define where database files are stored
+#                                               - configure the MariaDB socket
+#                                               - allow connections from other Docker containers
+#                                               - specify the port used by MariaDB
+#                                               - ensure MariaDB runs with the correct system user
+
 [mysqld]
-bind-address = 0.0.0.0
-port = 3306
+
+# Directory where MariaDB stores all databases, tables and internal files. Is mounted to a Docker volume for data persistence.
 datadir = /var/lib/mysql
+
+# Unix socket used by local MariaDB clients inside the container. Allows local communication without using the network stack.
+socket = /run/mysqld/mysqld.sock
+
+# Listen on all available network interfaces. This is required so that the WordPress container can connect to MariaDB through the Docker network.
+bind-address = 0.0.0.0
+
+# Default MariaDB TCP port. WordPress will connect to this port using mariadb:3306
+port = 3306
+
+# Run the MariaDB server using the dedicated mysql user.
+user = mysql
