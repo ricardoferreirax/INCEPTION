@@ -1,0 +1,187 @@
+Docker Engine installation
+
+	> Update System:  sudo apt-get update && sudo apt-get upgrade -y
+
+	> Install Required Depedencies:  sudo apt-get install ca-certificates curl gnupg -y
+
+      Installs the packages required to securely download and verify Docker packages:  -> ca-certificates: HTTPS certificate validation.
+																					   -> curl: Download files from the internet.
+																					   -> gnupg: Verify package signatures using GPG keys.
+
+	> Create Keyrings Directory:  sudo install -m 0755 -d /etc/apt/keyrings
+
+      Creates the directory where trusted repository keys will be stored.
+
+	> Add Docker Official GPG key:  curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+      Downloads Docker's official signing key and converts it to the binary GPG format required by APT.
+
+	> Set Key Permissions:  sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+	  Allows the APT package manager to read the Docker GPG key.
+
+	> Add Docker repository:  echo "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+							  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+	  Adds Docker's official repository to the APT sources list.
+
+	> Update packages: sudo apt-get update
+
+	> Check Docker Repository:  apt-cache policy docker-ce
+
+	  Checks that Docker packages will be downloaded from Docker's official repository instead of the default Debian repositories.
+
+	> Install Docker Engine:  sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+      Installs: -> docker-ce: Docker Engine.
+				-> docker-ce-cli: Docker command-line interface.
+				-> containerd.io: Container runtime.
+				-> docker-buildx-plugin: Advanced image building support.
+				-> docker-compose-plugin: Docker Compose v2 (docker compose).
+
+	> Start Docker Service:  sudo systemctl start docker
+
+	  Starts the Docker daemon immediately.
+
+	> Enable Docker at Boot:  sudo systemctl enable docker
+
+	  Ensures Docker starts automatically every time the system boots.
+
+	> Add User to Docker Group:  sudo gpasswd -a $USER docker
+
+	  Allows the current user to run Docker commands without using sudo.
+
+	> Apply Group Changes: newgrp docker
+
+	  Applies the new group membership without requiring a logout or reboot.
+
+	> Check Group Membership:  groups
+
+	  Confirms that the current user belongs to the Docker group.
+	  Expected output:  rmedeiro sudo docker
+
+	> Check Docker Installation:  docker run hello-world
+
+	  Downloads and runs Docker's test container. Expected output: Hello from Docker!
+      If this message appears, Docker is installed correctly.
+
+	> Check Docker Version:  docker --version
+
+	> Check Docker Compose:  docker compose version
+
+      Checks that Docker Compose v2 is installed and available.
+
+	> Check Docker Service Status:  systemctl status docker
+
+	  Displays the current state of the Docker daemon.
+      Expected status: active (running)
+
+    > Display Docker Information: docker info
+
+	  Displays detailed information about: - Docker version
+										   - Storage driver
+										   - Available networks
+										   - Available volumes
+										   - Docker root directory
+										   - Running containers
+
+	  This command is useful to confirm that the Docker daemon is fully operational.
+
+
+==========================================================================================================================================================================
+
+MariaDB Service
+
+The MariaDB container is the first service implemented in the Inception project. Its purpose is to provide a 
+database server that will later be used by the WordPress container.
+The MariaDB service is composed of three files:
+
+								requirements/mariadb/
+								├── Dockerfile
+								├── conf/
+								│   └── 50-server.cnf
+								└── tools/
+									└── init_mariadb.sh
+
+# Dockerfile
+
+The Dockerfile is responsible for building the MariaDB image. It starts from a Debian base image, installs MariaDB 
+Server, copies the configuration files and defines the startup script executed when the container starts.
+
+## FROM debian:bookworm
+
+Uses Debian Bookworm as the base image. The Inception subject requires every service to be built from a Debian or Alpine image.
+All subsequent instructions are executed inside this Debian environment.
+
+## EXPOSE 3306
+
+Documents that MariaDB listens on port 3306. It simply indicates which port the service uses internally.
+
+## Install MariaDB Server
+
+Updates the package lists and installs MariaDB Server. This package provides: - mariadbd
+																			  - database engine
+																			  - system tables
+																			  - configuration files
+
+Without it, the container would not be able to run MariaDB.
+
+==========================================================================================================================================================================
+
+Testing the MariaDB Docker Compose Configuration
+
+Before building the container, we have to make sure if exists: srcs/docker-compose.yml
+                                                               srcs/.env
+                                                               secrets/db_root_password.txt
+															   secrets/db_password.txt
+															   srcs/requirements/mariadb/Dockerfile
+
+Without a Dockerfile, Docker Compose cannot build the MariaDB image.
+
+Validate the Docker Compose Configuration
+
+Move to the srcs directory cd ~/inception/srcs and check the configuration: docker compose config
+This command checks docker-compose, networks, services without creating containers, images or volumes.
+
+Build the MariaDB Image: docker compose build mariadb
+This command reads the Dockerfile, builds the image and does not start any container.
+If the build succeeds, Docker will create a local image called mariadb.
+
+Verify the Image - list all local images: docker images
+Expected output: mariadb
+
+Create and Start the Container - start the MariaDB service: docker compose up mariadb
+Docker will create the network, the volume, the container and start the MariaDB service.
+
+Verify Running Containers - Open a new terminal and execute: docker ps
+
+Enter inside the Container:  docker exec -it mariadb sh
+
+Verify Docker Secrets - Inside the container: ls /run/secrets
+Expected output: db_root_password
+                 db_password
+
+Verify Docker Volume:  docker volume ls
+
+Inspect the Volume - Display detailed volume information:  docker volume inspect mariadb
+Expected output: /home/rmedeiro/data/mariadb
+
+Verify the Host Directory - Check the actual files stored on the host: ls -la /home/rmedeiro/data/mariadb
+Once MariaDB starts correctly, database files should begin appearing in this directory.
+This confirms that data persistence is working correctly.
+
+Stop the Service - Stop the running container: docker compose down
+This removes containers and networks but keeps volumes and database data.
+
+
+
+
+# The purpose of MariaDB server settings is to: - define a directory where MariaDB stores all databases, tables and internal files.
+#                                                 Is mounted to a Docker volume for data persistence.
+#                                               - configure the UNIX socket used by local MariaDB clients inside the container.
+#                                                 Allows local communication without using the network stack.
+#                                               - Listen on all available network interfaces. Allow connections from any IP. This is 
+#                                                 required so that the WordPress container can connect to MariaDB through the Docker network.
+#                                               - specify the default MariaDB TCP port used by MariaDB. WordPress will connect to this 
+#                                                 port using mariadb:3306
+#                                               - ensure MariaDB runs with the correct system user
