@@ -1,14 +1,15 @@
 # This Dockerfile builds the MariaDB container image. The image is built from Debian Bookworm and 
-# installs MariaDB Server. During startup: - MariaDB configuration is loaded
-#                                          - Docker secrets are read
-#                                          - database and users are created
-#                                          - MariaDB starts and listens on port 3306
+# installs only MariaDB Server.
 #
-# Copy the custom MariaDB configuration file. MariaDB automatically loads configuration files located
-#  in /etc/mysql/mariadb.conf.d/  .
-# Copy the initialization script into the container.
-# Make the initialization script executable.
-# Execute the initialization script when the container starts.
+# During container startup: - MariaDB loads its custom configuration file
+# 						    - Docker secrets are read by the initialization script
+# 						    - the WordPress database is created (if it does not exist)
+# 						    - the WordPress database user is created
+# 							- the required privileges are granted
+# 					        - MariaDB starts and listens on port 3306
+#
+# Database files are stored in /var/lib/mysql. This directory is connected to a Docker volume in 
+# docker-compose.yml,ensuring data persistence even if the container is recreated.
 
 FROM debian:bookworm
 

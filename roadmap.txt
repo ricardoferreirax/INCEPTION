@@ -608,3 +608,16 @@ This confirms that data persistence is working correctly.
 
 Stop the Service - Stop the running container: docker compose down
 This removes containers and networks but keeps volumes and database data.
+
+
+
+
+# The purpose of MariaDB server settings is to: - define a directory where MariaDB stores all databases, tables and internal files.
+#                                                 Is mounted to a Docker volume for data persistence.
+#                                               - configure the UNIX socket used by local MariaDB clients inside the container.
+#                                                 Allows local communication without using the network stack.
+#                                               - Listen on all available network interfaces. Allow connections from any IP. This is 
+#                                                 required so that the WordPress container can connect to MariaDB through the Docker network.
+#                                               - specify the default MariaDB TCP port used by MariaDB. WordPress will connect to this 
+#                                                 port using mariadb:3306
+#                                               - ensure MariaDB runs with the correct system user
