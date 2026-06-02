@@ -128,50 +128,6 @@ Without it, the container would not be able to run MariaDB.
 
 ==========================================================================================================================================================================
 
-Testing the MariaDB Docker Compose Configuration
-
-Before building the container, we have to make sure if exists: srcs/docker-compose.yml
-                                                               srcs/.env
-                                                               secrets/db_root_password.txt
-															   secrets/db_password.txt
-															   srcs/requirements/mariadb/Dockerfile
-
-Without a Dockerfile, Docker Compose cannot build the MariaDB image.
-
-Validate the Docker Compose Configuration
-
-Move to the srcs directory cd ~/inception/srcs and check the configuration: docker compose config
-This command checks docker-compose, networks, services without creating containers, images or volumes.
-
-Build the MariaDB Image: docker compose build mariadb
-This command reads the Dockerfile, builds the image and does not start any container.
-If the build succeeds, Docker will create a local image called mariadb.
-
-Verify the Image - list all local images: docker images
-Expected output: mariadb
-
-Create and Start the Container - start the MariaDB service: docker compose up mariadb
-Docker will create the network, the volume, the container and start the MariaDB service.
-
-Verify Running Containers - Open a new terminal and execute: docker ps
-
-Enter inside the Container:  docker exec -it mariadb sh
-
-Verify Docker Secrets - Inside the container: ls /run/secrets
-Expected output: db_root_password
-                 db_password
-
-Verify Docker Volume:  docker volume ls
-
-Inspect the Volume - Display detailed volume information:  docker volume inspect mariadb
-Expected output: /home/rmedeiro/data/mariadb
-
-Verify the Host Directory - Check the actual files stored on the host: ls -la /home/rmedeiro/data/mariadb
-Once MariaDB starts correctly, database files should begin appearing in this directory.
-This confirms that data persistence is working correctly.
-
-Stop the Service - Stop the running container: docker compose down
-This removes containers and networks but keeps volumes and database data.
 
 
 
