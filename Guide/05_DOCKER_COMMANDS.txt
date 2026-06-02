@@ -1,3 +1,102 @@
+DOCKER COMMANDS
+
+	1) Build All Images: docker compose build
+
+	   This builds all services defined in docker-compose.yml.
+	   
+	   Example:
+
+		services:
+		mariadb:
+		wordpress:
+		nginx:
+
+	   This command would build all three images.
+
+	   1.1) Build only one service: docker compose build mariadb 
+	        
+			Builds only, for example, mariadb image.
+	        Useful when we are working only on MariaDB and do not want to rebuild WordPress or Nginx.
+
+	   1.2) Build Without Cache:  docker compose build --no-cache mariadb
+
+	        This forces Docker to rebuild everything from zero for the mariadb service.
+            We use this when Docker seems to ignore changes in your Dockerfile or scripts.
+
+	2) Starting Containers 
+
+	   2.1) Start All Services:  docker compose up 
+
+	        This starts all services in the foreground. The terminal stays attached to the logs.
+			If we press CTRL + C , Docker stops the containers.
+
+	   2.2) Start One Service only:  docker compose up mariadb
+
+	        This starts only the mariadb service. Useful while testing MariaDB alone.
+
+	   2.3) Start And Build At The Same Time: docker compose up --build
+
+	        This builds the images first and then starts the containers.
+            We use this after changing: Dockerfile
+										scripts
+										config files
+										docker-compose.yml
+
+	   2.4) Start One Service And Rebuild It: docker compose up --build mariadb
+
+			This rebuilds and starts only MariaDB. Very useful during development.
+
+	   2.5) Start containers in background:  docker compose up -d
+
+			The -d means detached mode. The containers keep running, but your terminal becomes free.
+
+			For only MariaDB: docker compose up -d mariadb
+
+			Difference: docker compose up shows logs directly and stops with CTRL + C and
+                        docker compose up -d runs in background.
+
+	  3) Stopping Containers 
+
+	  	 3.1) Stop Containers Without Deleting Anything:  docker compose stop
+
+			  This stops the containers but keeps them created. 
+			  We can start them again with: docker compose start
+
+		 3.2) Stop and remove containers:  docker compose down
+
+			  This stops and removes the containers and the default network.
+              It does not delete named volumes by default.
+              We use this normally when restarting the project.
+
+		 3.3) Stop and remove containers + volumes:  docker compose down -v
+
+			  The -v means volumes. This removes containers, networks, and named volumes.
+              For Inception, this is useful when we want to reset MariaDB completely.
+
+			  Difference: docker compose down keeps the database data, otherwise, docker compose down -v
+                          removes the Docker volume. But if our volume is a bind mount to /home/rmedeiro/data/mariadb
+                          we may also need to delete the files manually.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 limpa o volume antigo:
 
 docker compose down -v
