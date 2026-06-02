@@ -1,0 +1,62 @@
+limpa o volume antigo:
+
+docker compose down -v
+docker volume rm mariadb 2>/dev/null
+
+
+sobe o docker:
+
+docker compose up --build ou docker compose up
+
+docker compose logs mariadb
+
+convém parar os containers:
+
+docker compose down
+
+E verificar se algum volume ainda está a usar essa pasta:
+
+docker volume ls
+
+docker volume inspect mariadb
+
+Entra no container:
+
+docker exec -it mariadb bash
+
+Liga-te como root:
+
+mariadb -u root -p
+
+Introduz a password do ficheiro:
+
+db_root_password.txt
+
+Depois:
+
+SHOW DATABASES;
+
+Deverás ver:
+
+wordpress
+information_schema
+mysql
+performance_schema
+sys
+
+Verifica os utilizadores:
+
+SELECT User, Host FROM mysql.user;
+
+Deverás ver algo semelhante a:
+
+root      localhost
+rmedeiro  %
+
+Vê o estado real:
+
+docker ps -a
+
+docker compose down -v
+sudo rm -rf /home/rmedeiro/data/mariadb/*
+docker compose up --build mariadb
