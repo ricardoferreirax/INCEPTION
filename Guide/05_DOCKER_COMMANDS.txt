@@ -1,6 +1,8 @@
 DOCKER COMMANDS
 
-	1) Build All Images: docker compose build
+	1) Build Commands 
+	
+	   Build All Images: docker compose build
 
 	   This builds all services defined in docker-compose.yml.
 	   
@@ -22,6 +24,7 @@ DOCKER COMMANDS
 
 	        This forces Docker to rebuild everything from zero for the mariadb service.
             We use this when Docker seems to ignore changes in your Dockerfile or scripts.
+
 
 	2) Starting Containers 
 
@@ -55,6 +58,7 @@ DOCKER COMMANDS
 			Difference: docker compose up shows logs directly and stops with CTRL + C and
                         docker compose up -d runs in background.
 
+
 	  3) Stopping Containers 
 
 	  	 3.1) Stop Containers Without Deleting Anything:  docker compose stop
@@ -78,84 +82,126 @@ DOCKER COMMANDS
                           we may also need to delete the files manually.
 
 
+	  4) Listing Containers 
+
+	  	4.1) Show Running Containers: docker ps 
+
+		     THis only shows containers that are currently running.
+
+		4.2) Show All Containers: docker ps -a 
+
+		     THis shows running and stopped containers. Useful when a container exited.
+
+
+	  5) Containers Cleanup
+
+	     5.1) Remove Stopped Containers:  docker container prune 
+
+		      THis deletes stopped containers. It does not delete running containers.
+
+		 5.2) Remove One Container: docker rm mariadb 
+
+		      If it is running:  docker stop mariadb 
+			                     docker rm mariadb 
+
+		      Or force:  docker rm -f mariadb
+
+
+	  5) Images 
+
+	     5.1) List Images:  docker images    or   docker image ls 
+
+		 5.2) Remove One Image:  docker rmi mariadb
+		     
+			  If it is being used by a container:  docker compose down
+												   docker rmi mariadb
+
+		 5.3) Remove Unused Images:  docker image prune
+
+		      THis removes dangling/unused images.
+
+			  More aggressive:  docker image prune -a 
+
+			  The -a removes all unused images.
+
+
+	  5) Volumes 
+
+	     5.1) List Docker Volumes:  docker volume ls 
+
+		 5.2) Inspect A Volume:  docker volume inspect mariadb 
+
+		      This shows details about the volume. From bind mount, we should see something like:
+
+			  "Options": {
+  				"device": "/home/rmedeiro/data/mariadb",
+  				"o": "bind",
+  				"type": "none"
+			   }
+
+			   This means Docker is using the real host directory: /home/rmedeiro/data/mariadb inside the Debian VM.
+
+		 5.3) Remove A Volume: docker volume rm mariadb 
+
+		      THis removes the DOcker volume. 
+			  If it says the volume is in use, we have to stop first using docker compose down and then 
+			  docker volume rm mariadb
+
+
+	  5) Logs 
+
+	    5.1) Show Logs For All Services:  docker compose logs 
+
+		5.2) Follow logs live: docker compose logs -f mariadb
+
+
+	  6) Deleting The Whole Data Directory 
+
+	     Stop containers first: docker compose down -v
+
+		 Then delete: sudo rm -rf /home/rmedeiro/data
+
+		 Then recreate:  mkdir -p /home/rmedeiro/data/mariadb
+						 mkdir -p /home/rmedeiro/data/wordpress
+
+		 Check permissions:  ls -ld /home/rmedeiro/data
+							 ls -ld /home/rmedeiro/data/mariadb
+							 ls -ld /home/rmedeiro/data/wordpress
+
+
+	  6) Entering A Container and SQL Commands
+
+	     6.1) Enter a container by open a shell inside MariaDB:  docker exec -it mariadb sh
+
+			  Meaning:  docker exec   run a command inside an existing container
+							-i        interactive mode
+							-t        allocate a terminal
+						  mariadb     container name
+							sh        command to run
+
+			  This only works if the container is running.
+
+		 6.2) Connect as root:  mariadb -u root -p 
+
+		       It will ask for the password (the password inside secrets/db_root_password.txt).
+
+		 6.3) Show Databases:  SHOW DATABASES;
+
+		      Expected:  information_schema
+						 mysql
+						 performance_schema
+						 sys
+						 wordpress
+
+			  The important one is: wordpress
+
+		 6.4) Show Users: SELECT User, Host FROM mysql.user;
+
+		      Expected example:   root      localhost
+								  rmedeiro   %
+
+		 6.5) Check Privileges: SHOW GRANTS FOR 'rmedeiro'@'%';
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-limpa o volume antigo:
-
-docker compose down -v
-docker volume rm mariadb 2>/dev/null
-
-
-sobe o docker:
-
-docker compose up --build ou docker compose up
-
-docker compose logs mariadb
-
-convém parar os containers:
-
-docker compose down
-
-E verificar se algum volume ainda está a usar essa pasta:
-
-docker volume ls
-
-docker volume inspect mariadb
-
-Entra no container:
-
-docker exec -it mariadb bash
-
-Liga-te como root:
-
-mariadb -u root -p
-
-Introduz a password do ficheiro:
-
-db_root_password.txt
-
-Depois:
-
-SHOW DATABASES;
-
-Deverás ver:
-
-wordpress
-information_schema
-mysql
-performance_schema
-sys
-
-Verifica os utilizadores:
-
-SELECT User, Host FROM mysql.user;
-
-Deverás ver algo semelhante a:
-
-root      localhost
-rmedeiro  %
-
-Vê o estado real:
-
-docker ps -a
-
-docker compose down -v
-sudo rm -rf /home/rmedeiro/data/mariadb/*
-docker compose up --build mariadb
+		
