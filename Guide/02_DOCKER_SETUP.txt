@@ -87,45 +87,6 @@ Docker Engine installation
 
 	  This command is useful to confirm that the Docker daemon is fully operational.
 
-
-==========================================================================================================================================================================
-
-MariaDB Service
-
-The MariaDB container is the first service implemented in the Inception project. Its purpose is to provide a 
-database server that will later be used by the WordPress container.
-The MariaDB service is composed of three files:
-
-								requirements/mariadb/
-								├── Dockerfile
-								├── conf/
-								│   └── 50-server.cnf
-								└── tools/
-									└── init_mariadb.sh
-
-# Dockerfile
-
-The Dockerfile is responsible for building the MariaDB image. It starts from a Debian base image, installs MariaDB 
-Server, copies the configuration files and defines the startup script executed when the container starts.
-
-## FROM debian:bookworm
-
-Uses Debian Bookworm as the base image. The Inception subject requires every service to be built from a Debian or Alpine image.
-All subsequent instructions are executed inside this Debian environment.
-
-## EXPOSE 3306
-
-Documents that MariaDB listens on port 3306. It simply indicates which port the service uses internally.
-
-## Install MariaDB Server
-
-Updates the package lists and installs MariaDB Server. This package provides: - mariadbd
-																			  - database engine
-																			  - system tables
-																			  - configuration files
-
-Without it, the container would not be able to run MariaDB.
-
 ==========================================================================================================================================================================
 
 
