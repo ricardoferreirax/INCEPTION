@@ -10,12 +10,13 @@ RUN mkdir -p /run/php /var/www/html
 
 COPY conf/www.conf /etc/php/8.2/fpm/pool.d/www.conf
 
-COPY 
+COPY tools/init_wordpress.sh /bin/init_wordpress.sh
 
-RUN 
+RUN chmod +x /bin/init_wordpress.sh \
+	&& chown -R www-data:www-data /var/www/html /run/php
 
 WORKDIR /var/www/html
 
 EXPOSE 9000
 
-ENTRYPOINT [""]
+ENTRYPOINT ["/bin/init_wordpress.sh"]
