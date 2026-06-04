@@ -1014,3 +1014,332 @@ Use this command only when:
 * We want to clean old project data.
 * We want to free disk space.
 
+---
+
+# 9. Networks
+
+Docker networks allow containers to communicate with each other.
+
+In Docker Compose, services are usually connected to the same network automatically.
+
+This allows containers to reach each other using service names. For example, WordPress can connect to MariaDB using ``mariadb`` as the database host.
+
+It does not need to know the MariaDB container IP address.
+
+---
+
+## 9.1 List Networks
+
+<div align="center">
+
+<pre><code class="language-bash">docker network ls</code></pre>
+
+</div>
+
+This command lists all Docker networks.
+
+Example:
+
+```text
+NETWORK ID     NAME              DRIVER    SCOPE
+abc123         bridge            bridge    local
+def456         host              host      local
+ghi789         none              null      local
+jkl012         srcs_inception    bridge    local
+```
+
+Docker Compose usually creates a project network.
+
+The name may look like:
+
+```text
+srcs_inception
+```
+
+Use this command when:
+
+* We want to verify that the Compose network exists.
+* We want to inspect networking.
+* Containers cannot communicate.
+* WordPress cannot connect to MariaDB.
+* Nginx cannot connect to WordPress.
+
+---
+
+## 9.2 Inspect a Network
+
+<div align="center">
+
+<pre><code class="language-bash">docker network inspect srcs_inception</code></pre>
+
+</div>
+
+This command displays detailed information about a Docker network.
+
+It shows:
+
+* Which containers are connected.
+* Container IP addresses.
+* Network driver.
+* Network configuration.
+* Gateway.
+* Subnet.
+
+This is useful to verify that all services are attached to the same network.
+
+Expected services:
+
+* MariaDB
+* WordPress
+* Nginx
+
+If WordPress cannot connect to MariaDB, inspect the network and confirm that both containers are connected to it.
+
+Use this command when:
+
+* A service cannot reach another service.
+* Database connection fails.
+* Nginx cannot reach WordPress.
+* We want to confirm container networking.
+* We want to debug DNS resolution between containers.
+
+---
+
+# 10. Managing Bind Mount Directories
+
+In the Inception project, persistent data must be stored on the VM host.
+
+The subject expects data to be stored under: ``/home/login/data``
+
+Usually, we need at least two directories:
+
+* `/home/rmedeiro/data/mariadb`
+* `/home/rmedeiro/data/wordpress`
+
+MariaDB stores database files in the MariaDB directory.
+
+WordPress stores website files in the WordPress directory.
+
+---
+
+## 10.1 Completely Reset Project Data
+
+<div align="center">
+
+<pre><code class="language-bash">docker compose down -v
+
+sudo rm -rf /home/rmedeiro/data
+
+mkdir -p /home/rmedeiro/data/mariadb
+mkdir -p /home/rmedeiro/data/wordpress</code></pre>
+
+</div>
+
+This performs a full persistent data reset.
+
+Step by step:
+
+```bash
+docker compose down -v
+```
+
+Stops containers and removes named volumes.
+
+```bash
+sudo rm -rf /home/rmedeiro/data
+```
+
+Deletes the real persistent data directory from the VM.
+
+```bash
+mkdir -p /home/rmedeiro/data/mariadb
+mkdir -p /home/rmedeiro/data/wordpress
+```
+
+Recreates the required directories.
+
+Use this only when:
+
+* We want a completely fresh project state.
+* We want MariaDB to initialize from zero.
+* We want to delete all WordPress files.
+* We are debugging installation scripts.
+* We accept losing all database and WordPress data.
+
+---
+
+# 11. Entering Containers and MariaDB Commands
+
+We may need to enter a running container and inspect the filesystem, test commands, or connect to MariaDB manually.
+
+Docker allows running commands inside existing containers with `docker exec`.
+
+---
+
+## 11.1 Enter the MariaDB Container
+
+<div align="center">
+
+<pre><code class="language-bash">docker exec -it mariadb sh</code></pre>
+
+</div>
+
+This opens a shell inside the running MariaDB container.
+
+Meaning:
+
+| Part          | Description                                |
+| ------------- | ------------------------------------------ |
+| `docker exec` | Run a command inside an existing container |
+| `-i`          | Interactive mode                           |
+| `-t`          | Allocate a terminal                        |
+| `mariadb`     | Container name                             |
+| `sh`          | Shell to open                              |
+
+This command only works if the container is already running.
+
+Check first with:
+
+<div align="center">
+
+<pre><code class="language-bash">docker ps</code></pre>
+
+</div>
+
+Use this command when:
+
+* We want to inspect files inside the container.
+* We want to test MariaDB manually.
+* We want to check environment variables.
+* We want to verify installed packages.
+
+---
+
+## 11.2 Connect as MariaDB Root
+
+<div align="center">
+
+<pre><code class="language-bash">mariadb -u root -p</code></pre>
+
+</div>
+
+This connects to MariaDB using the `root` user.
+
+Meaning:
+
+| Part      | Description            |
+| --------- | ---------------------- |
+| `mariadb` | MariaDB client command |
+| `-u root` | Connect as user `root` |
+| `-p`      | Ask for password       |
+
+MariaDB will ask for the password interactively.
+
+The password should match the content of: ``secrets/db_root_password``
+
+Use this command when:
+
+* We want to inspect the database manually.
+* We want to check users.
+* We want to check privileges.
+* We want to verify the WordPress database exists.
+* We want to debug MariaDB initialization.
+
+---
+
+## 11.3 Show Databases
+
+<div align="center">
+
+<pre><code class="language-sql">SHOW DATABASES;</code></pre>
+
+</div>
+
+This SQL command lists all databases inside MariaDB.
+
+Expected output:
+
+```text
+information_schema
+mysql
+performance_schema
+sys
+wordpress
+```
+
+Important databases:
+
+| Database             | Meaning                                  |
+| -------------------- | ---------------------------------------- |
+| `information_schema` | Internal metadata database               |
+| `mysql`              | Internal MariaDB system database         |
+| `performance_schema` | Performance monitoring database          |
+| `sys`                | Helper views for database administration |
+| `wordpress`          | Project database used by WordPress       |
+
+The important database for Inception is: ``wordpress``
+
+If the `wordpress` database does not exist, then the MariaDB initialization script probably failed or did not run.
+
+---
+
+## 11.4 Show Existing Users
+
+<div align="center">
+
+<pre><code class="language-sql">SELECT User, Host FROM mysql.user;</code></pre>
+
+</div>
+
+This command lists MariaDB users and the hosts from which they are allowed to connect.
+
+Example:
+
+```text
+root       localhost
+rmedeiro   %
+```
+
+Meaning:
+
+| User       | Host        | Meaning                                                       |
+| ---------- | ----------- | ------------------------------------------------------------- |
+| `root`     | `localhost` | Root can connect locally inside the database container        |
+| `rmedeiro` | `%`         | User can connect from any host, including WordPress container |
+
+The `%` host is important because WordPress runs in a different container.
+
+If the user is only allowed from `localhost`, WordPress may not be able to connect.
+
+Use this command when:
+
+* We want to verify database users.
+* We want to confirm remote container access.
+* We want to debug authentication problems.
+
+---
+
+## 11.5 Check User Privileges
+
+<div align="center">
+
+<pre><code class="language-sql">SHOW GRANTS FOR 'rmedeiro'@'%';</code></pre>
+
+</div>
+
+This command displays the privileges assigned to the MariaDB user.
+
+Expected idea:
+
+```text
+GRANT ALL PRIVILEGES ON `wordpress`.* TO `rmedeiro`@`%`
+```
+
+This means the user `rmedeiro` can use the `wordpress` database.
+
+Use this command when:
+
+* We want to verify the user has access to the correct database.
+* We want to confirm the init script created privileges correctly.
+
+---
