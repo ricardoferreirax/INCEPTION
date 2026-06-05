@@ -41,12 +41,10 @@ services:
     restart: always
 
 networks:
-
   inception:
     driver: bridge
 
 volumes:
-
   mariadb:
     name: mariadb
     driver: local
@@ -64,7 +62,6 @@ volumes:
       device: /home/rmedeiro/data/wordpress
 
 secrets:
-
   db_root_password:
     file: ../secrets/db_root_password.txt
   db_password:

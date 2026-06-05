@@ -31,40 +31,29 @@ if [ ! -d "$DATADIR/mysql" ]; then
 	# Examples: mysql.user, mysql.db, privilege tables, system metadata.
 	# --user=mysql makes the created files belong to the mysql user. | --datadir tells MariaDB where to create the database files.
 	mariadb-install-db --user=mysql --datadir="$DATADIR"
-
-	echo "Creating MariaDB initialization file..."
-
-	# Create a temporary SQL file.
-	# CREATE DATABASE IF NOT EXISTS: Creates the WordPress database if it does not already exist.
-	# CREATE USER IF NOT EXISTS: Creates the MariaDB user used by WordPress. The '%' host means this user can 
-	# 							 connect from other containers in the Docker network.
-	# GRANT ALL PRIVILEGES: Gives the WordPress database user full permissions on the WordPress database only.
-	# ALTER USER: Sets the root password for root@localhost.
-	# FLUSH PRIVILEGES: Reloads privilege tables so the changes are applied immediately.
-	cat > "$INIT_FILE" << EOF
-	CREATE DATABASE IF NOT EXISTS \`${MDB_DATABASE}\`;
-	CREATE USER IF NOT EXISTS '${MDB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';
-	GRANT ALL PRIVILEGES ON \`${MDB_DATABASE}\`.* TO '${MDB_USER}'@'%';
-	ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}';
-	FLUSH PRIVILEGES;
-EOF
-
-	echo "MariaDB first-time configuration completed."
-
-	echo "Starting MariaDB with init file..."
-
-	# Start the MariaDB server.
-	# --user=mysql makes MariaDB run as the mysql user instead of root. | --datadir points MariaDB to the persistent database directory.
-	# --init-file executes the SQL file once during startup.
-	# exec replaces the shell script process with mysqld. This is important because mysqld becomes PID 1 inside the container.
-	exec mysqld --user=mysql --datadir="$DATADIR" --init-file="$INIT_FILE"
 fi
 
-# If /var/lib/mysql/mysql already exists, the database was already initialized before. The script skips database/user creation.
-echo "MariaDB already initialized."
+echo "Creating MariaDB initialization file..."
 
-echo "Starting MariaDB normally..."
+# Create a temporary SQL file.
+# CREATE DATABASE IF NOT EXISTS: Creates the WordPress database if it does not already exist.
+# CREATE USER IF NOT EXISTS: Creates the MariaDB user used by WordPress. The '%' host means this user can 
+# 							 connect from other containers in the Docker network.
+# GRANT ALL PRIVILEGES: Gives the WordPress database user full permissions on the WordPress database only.
+# ALTER USER: Sets the root password for root@localhost.
+# FLUSH PRIVILEGES: Reloads privilege tables so the changes are applied immediately.
+cat > "$INIT_FILE" << EOF
+CREATE DATABASE IF NOT EXISTS \`${MDB_DATABASE}\`;
+CREATE USER IF NOT EXISTS '${MDB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON \`${MDB_DATABASE}\`.* TO '${MDB_USER}'@'%';
+ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}';
+FLUSH PRIVILEGES;
+EOF
 
-# Start MariaDB normally without --init-file. This prevents recreating users or re-running initialization SQL on every restart.
+echo "Starting MariaDB with init file..."
+
+# Start the MariaDB server.
+# --user=mysql makes MariaDB run as the mysql user instead of root. | --datadir points MariaDB to the persistent database directory.
+# --init-file executes the SQL file once during startup.
 # exec replaces the shell script process with mysqld. This is important because mysqld becomes PID 1 inside the container.
-exec mysqld --user=mysql --datadir="$DATADIR"
+exec mysqld --user=mysql --datadir="$DATADIR" --init-file="$INIT_FILE"

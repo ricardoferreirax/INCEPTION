@@ -15,7 +15,6 @@ ENTRYPOINT ["/bin/init_mariadb.sh"]
 
 
 
-
 # This Dockerfile is used to build the image for the MariaDB database container.
 # Use Debian Bookworm as the base operating system for the image. Every instruction that follows will be 
 # executed on top of this Debian filesystem. The image initially contains only the minimal Debian environment 
