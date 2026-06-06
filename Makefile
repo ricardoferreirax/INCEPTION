@@ -6,7 +6,7 @@
 #    By: rmedeiro <rmedeiro@student.42lisboa.com    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/06/05 22:53:35 by rmedeiro          #+#    #+#              #
-#    Updated: 2026/06/06 20:47:30 by rmedeiro         ###   ########.fr        #
+#    Updated: 2026/06/06 23:28:07 by rmedeiro         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -55,8 +55,7 @@ clean:
 	$(COMPOSE) down -v
 
 fclean: clean
-	sudo rm -rf $(MDB_DIR)
-	sudo rm -rf $(WP_DIR)
+	sudo rm -rf $(DATA_DIR)
 
 re: fclean up
 
