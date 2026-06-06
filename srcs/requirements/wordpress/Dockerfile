@@ -1,22 +1,17 @@
 FROM debian:bookworm
 
-RUN apt-get update && apt-get install -y php-fpm php-mysql php-curl php-zip \
-	mariadb-client curl wget tar ca-certificates
+RUN apt-get update && apt-get install -y php-fpm php-mysql mariadb-client curl \
+	ca-certificates && rm -rf /var/lib/apt/lists/*
 
-RUN curl -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
-	&& chmod +x /usr/local/bin/wp
+RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+	&& chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp
 
-RUN mkdir -p /run/php /var/www/html
+RUN mkdir -p /var/www/html /run/php && chown -R www-data:www-data /var/www/html /run/php
 
-COPY conf/www.conf /etc/php/8.2/fpm/pool.d/www.conf
+COPY ./tools/init_wordpress.sh /usr/local/bin/init_wordpress.sh
 
-COPY tools/init_wordpress.sh /bin/init_wordpress.sh
-
-RUN chmod +x /bin/init_wordpress.sh \
-	&& chown -R www-data:www-data /var/www/html /run/php
-
-WORKDIR /var/www/html
+RUN chmod +x /usr/local/bin/init_wordpress.sh
 
 EXPOSE 9000
 
-ENTRYPOINT ["/bin/init_wordpress.sh"]
+ENTRYPOINT ["init_wordpress.sh"]
