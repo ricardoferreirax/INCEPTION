@@ -51,7 +51,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /home/rmedeiro/data/mariadb
+      device: /home/${USER}/data/mariadb
 
   wordpress:
     name: wordpress
@@ -59,7 +59,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /home/rmedeiro/data/wordpress
+      device: /home/${USER}/data/wordpress
 
 secrets:
   db_root_password:

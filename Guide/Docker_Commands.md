@@ -175,7 +175,21 @@ Docker Compose uses the `docker-compose.yml` file to know:
 
 This command starts all services defined in the `docker-compose.yml` file.
 
-If the **containers** do not exist yet, Docker Compose creates them.
+This command reads the `docker-compose.yml` file and starts all services. Creates the complete application stack defined inside it.
+
+When executed, Docker Compose performs multiple operations:
+
+```text
+1. Reads docker-compose.yml
+2. Creates missing networks
+3. Creates missing volumes
+4. Creates containers if do not exist
+5. Starts containers
+```
+
+Internally, Docker communicates with the Docker daemon (`dockerd`) through the Docker API.
+
+The daemon then creates all resources required by the application.
 
 If the **required images** do not exist yet, Docker Compose may build them first if a `build:` section exists.
 
@@ -508,6 +522,7 @@ The most important columns are:
 We use this command when:
 
 * We want to check if the project is running.
+6. Attaches logs to the terminal
 * We want to verify container names.
 * We want to see container status.
 * We want to confirm that no service crashed.
