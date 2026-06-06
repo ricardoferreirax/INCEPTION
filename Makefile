@@ -6,7 +6,7 @@
 #    By: rmedeiro <rmedeiro@student.42lisboa.com    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/06/05 22:53:35 by rmedeiro          #+#    #+#              #
-#    Updated: 2026/06/06 23:28:07 by rmedeiro         ###   ########.fr        #
+#    Updated: 2026/06/06 23:47:58 by rmedeiro         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -59,4 +59,4 @@ fclean: clean
 
 re: fclean up
 
-.PHONY: all dirs build no-cache up db wp nginxdown stop start clean fclean re
+.PHONY: all dirs build no-cache up db wp nginx down stop start clean fclean re
