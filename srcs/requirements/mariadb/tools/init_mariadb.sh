@@ -47,12 +47,10 @@ if [ -d "$MARIADB_DATA_DIR/mysql" ]; then
 else
 	echo "[MARIADB] >> MariaDB system tables not found."
 	echo "[MARIADB] >> Installing MariaDB system tables..."
-
 	mariadb-install-db --user=mysql --datadir="$MARIADB_DATA_DIR"
 fi
 
 echo "[MARIADB] >> Starting temporary MariaDB server..."
-
 mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET" &
 
 until mariadb --socket="$MARIADB_SOCKET" -e "SELECT 1" >/dev/null 2>&1
@@ -62,7 +60,6 @@ do
 done
 
 echo "[MARIADB] >> Creating database and user if needed..."
-
 mariadb --socket="$MARIADB_SOCKET" -u root << EOF
 CREATE DATABASE IF NOT EXISTS \`${MDB_DATABASE}\`;
 CREATE USER IF NOT EXISTS '${MDB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';
@@ -72,9 +69,7 @@ FLUSH PRIVILEGES;
 EOF
 
 echo "[MARIADB] >> Stopping temporary MariaDB server..."
-
 mariadb-admin --socket="$MARIADB_SOCKET" -u root -p"${DB_ROOT_PASSWORD}" shutdown
 
 echo "[MARIADB] >> Starting MariaDB..."
-
 exec mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET"
