@@ -1,53 +1,69 @@
 #!/bin/bash
 
-# Stop the script if any command fails. Prevents MariaDB from starting with a broken or incomplete configuration.
 set -e
 
-# Define the path where MariaDB stores its database files. This directory is mounted to the MariaDB volume in docker-compose.yml.
-DATADIR="/var/lib/mysql"
+MARIADB_DATA_DIR="/var/lib/mysql"
+MARIADB_RUN_DIR="/run/mysqld"
+MARIADB_SOCKET="$MARIADB_RUN_DIR/mysqld.sock"
+MARIADB_CONFIG_FILE="/etc/mysql/mariadb.conf.d/docker.cnf"
 
-# Define the temporary SQL file that will be used during the first MariaDB startup.
-# This file will contain SQL commands to create the database, user, privileges, and root password.
-INIT_FILE="/tmp/mariadb_init.sql"
-
-# Reads the passwords from the Docker secrets.
-DB_ROOT_PASSWORD=$(cat /run/secrets/db_root_password)
-DB_PASSWORD=$(cat /run/secrets/db_password)
-
-# Create the runtime directory used by MariaDB. MariaDB needs this directory for files such as the socket and PID file.
-mkdir -p /run/mysqld
-
-# Give ownership of /run/mysqld and /var/lib/mysql to the mysql user and group.
-# MariaDB runs as the mysql user, so it needs permission to write to these directories.
-chown -R mysql:mysql /run/mysqld "$DATADIR"
-
-# Check if the internal MariaDB system database directory does not exist.
-# If /var/lib/mysql/mysql, MariaDB has never been initialized and the system tables must be created.
-# This block must only run on the first container startup.
-if [ ! -d "$DATADIR/mysql" ]; then
-	echo "Installing MariaDB system tables..."
-
-	# Initialize the MariaDB data directory. This creates the internal system tables needed by MariaDB.
-	# Examples: mysql.user, mysql.db, privilege tables, system metadata.
-	# --user=mysql makes the created files belong to the mysql user. | --datadir tells MariaDB where to create the database files.
-	mariadb-install-db --user=mysql --datadir="$DATADIR"
+if [ -f /run/secrets/db_password ]; then
+	DB_PASSWORD=$(cat /run/secrets/db_password)
+else
+	echo "[ERROR] >> db_password secret not found."
+	exit 1
 fi
 
-# Check if the WordPress database directory exists.
-# If it does not exist, the WordPress database and user have not been created yet.
-# In that case, we create an initialization SQL file and start MariaDB with --init-file
-# so the database, user and privileges are created automatically during startup.
-if [ ! -d "$DATADIR/$MDB_DATABASE" ]; then
-	echo "Creating MariaDB initialization file..."
+if [ -f /run/secrets/db_root_password ]; then
+	DB_ROOT_PASSWORD=$(cat /run/secrets/db_root_password)
+else
+	echo "[ERROR] >> db_root_password secret not found."
+	exit 1
+fi
 
-	# Create a temporary SQL file.
-	# CREATE DATABASE IF NOT EXISTS: Creates the WordPress database if it does not already exist.
-	# CREATE USER IF NOT EXISTS: Creates the MariaDB user used by WordPress. The '%' host means this user can 
-	# 							 connect from other containers in the Docker network.
-	# GRANT ALL PRIVILEGES: Gives the WordPress database user full permissions on the WordPress database only.
-	# ALTER USER: Sets the root password for root@localhost.
-	# FLUSH PRIVILEGES: Reloads privilege tables so the changes are applied immediately.
-	cat > "$INIT_FILE" << EOF
+if [ -z "$MDB_DATABASE" ] || [ -z "$MDB_USER" ]; then
+	echo "[ERROR] >> Required environment variables are missing."
+	exit 1
+fi
+
+mkdir -p "$MARIADB_RUN_DIR"
+mkdir -p "$MARIADB_DATA_DIR"
+mkdir -p /etc/mysql/mariadb.conf.d
+
+chown -R mysql:mysql "$MARIADB_RUN_DIR" "$MARIADB_DATA_DIR"
+
+cat > "$MARIADB_CONFIG_FILE" << EOF
+[mysqld]
+bind-address=0.0.0.0
+port=3306
+datadir=${MARIADB_DATA_DIR}
+socket=${MARIADB_SOCKET}
+skip-networking=0
+EOF
+
+if [ -d "$MARIADB_DATA_DIR/mysql" ]; then
+	echo "[MARIADB] >> MariaDB system tables already exist."
+	echo "[MARIADB] >> Skipping system table installation."
+else
+	echo "[MARIADB] >> MariaDB system tables not found."
+	echo "[MARIADB] >> Installing MariaDB system tables..."
+
+	mariadb-install-db --user=mysql --datadir="$MARIADB_DATA_DIR"
+fi
+
+echo "[MARIADB] >> Starting temporary MariaDB server..."
+
+mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET" &
+
+until mariadb --socket="$MARIADB_SOCKET" -e "SELECT 1" >/dev/null 2>&1
+do
+	echo "[MARIADB] >> Waiting for MariaDB server..."
+	sleep 1
+done
+
+echo "[MARIADB] >> Creating database and user if needed..."
+
+mariadb --socket="$MARIADB_SOCKET" -u root << EOF
 CREATE DATABASE IF NOT EXISTS \`${MDB_DATABASE}\`;
 CREATE USER IF NOT EXISTS '${MDB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';
 GRANT ALL PRIVILEGES ON \`${MDB_DATABASE}\`.* TO '${MDB_USER}'@'%';
@@ -55,16 +71,10 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}';
 FLUSH PRIVILEGES;
 EOF
 
-	echo "Starting MariaDB with init file..."
+echo "[MARIADB] >> Stopping temporary MariaDB server..."
 
-	# Start the MariaDB server.
-	# --user=mysql makes MariaDB run as the mysql user instead of root. | --datadir points MariaDB to the persistent database directory.
-	# --init-file executes the SQL file once during startup.
-	# exec replaces the shell script process with mysqld. This is important because mysqld becomes PID 1 inside the container.
-	exec mysqld --user=mysql --datadir="$DATADIR" --init-file="$INIT_FILE"
-fi
+mariadb-admin --socket="$MARIADB_SOCKET" -u root -p"${DB_ROOT_PASSWORD}" shutdown
 
-echo "MariaDB database already exists."
-echo "Starting MariaDB normally..."
+echo "[MARIADB] >> Starting MariaDB..."
 
-exec mysqld --user=mysql --datadir="$DATADIR"
+exec mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET"
