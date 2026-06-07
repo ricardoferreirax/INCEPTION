@@ -6,7 +6,7 @@
 #    By: rmedeiro <rmedeiro@student.42lisboa.com    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/06/05 22:53:35 by rmedeiro          #+#    #+#              #
-#    Updated: 2026/06/07 12:10:58 by rmedeiro         ###   ########.fr        #
+#    Updated: 2026/06/07 16:46:06 by rmedeiro         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -20,27 +20,21 @@ WP_DIR = $(DATA_DIR)/wordpress
 
 all: up
 
-dirs:
-	mkdir -p $(MDB_DIR)
-	mkdir -p $(WP_DIR)
-
 build:
 	$(COMPOSE) build
 
 no-cache:
 	$(COMPOSE) build --no-cache
 
-up: dirs
+up: 
+	mkdir -p $(MDB_DIR)
+	mkdir -p $(WP_DIR)
 	$(COMPOSE) up -d --build
 
-db: dirs
+db: 
+	mkdir -p $(MDB_DIR)
+	mkdir -p $(WP_DIR)
 	$(COMPOSE) up -d --build mariadb
-
-wp: dirs
-	$(COMPOSE) up -d --build wordpress
-
-nginx: dirs
-	$(COMPOSE) up -d --build nginx
 
 down:
 	$(COMPOSE) down
@@ -51,6 +45,9 @@ stop:
 start:
 	$(COMPOSE) start
 
+logs:
+	$(COMPOSE) logs -f
+
 clean:
 	$(COMPOSE) down -v
 
@@ -59,4 +56,4 @@ fclean: clean
 
 re: fclean up
 
-.PHONY: all dirs build no-cache up db wp nginx down stop start clean fclean re
+.PHONY: all dirs build no-cache up db down stop start clean fclean re

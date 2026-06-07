@@ -48,7 +48,7 @@ echo "[WORDPRESS] >> Checking required environment variables..."
 if [ -z "$MDB_HOST" ] || [ -z "$MDB_DATABASE" ] || [ -z "$MDB_USER" ] || \
 	[ -z "$WP_URL" ] || [ -z "$WP_TITLE" ] || [ -z "$WP_ADMIN_USER" ] || \
 	[ -z "$WP_ADMIN_EMAIL" ] || [ -z "$WP_USER" ] || [ -z "$WP_USER_EMAIL" ] || \
-	[ -z "$WP_USER_ROLE" ]
+	[ -z "$WP_USER_ROLE" ];
 then
 	echo "[ERROR] >> Required environment variables are missing."
 	exit 1

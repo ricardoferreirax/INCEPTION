@@ -40,6 +40,24 @@ services:
       - mariadb
     restart: always
 
+  nginx:
+    build:
+      context: ./requirements/nginx
+      dockerfile: Dockerfile
+    container_name: nginx
+    image: nginx
+    volumes:
+      - wordpress:/var/www/html
+    networks:
+      - inception
+    ports:
+      - "443:443"
+    env_file:
+      - .env
+    depends_on:
+      - wordpress
+    restart: always
+
 networks:
   inception:
     driver: bridge
