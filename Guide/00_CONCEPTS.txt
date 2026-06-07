@@ -44,6 +44,11 @@
 
 
 
+docker exec -it wordpress sh
+cd /var/www/html
+wp core is-installed --allow-root
+wp user list --allow-root
+wp option get siteurl --allow-root
 
 
 
