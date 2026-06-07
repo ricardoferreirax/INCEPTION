@@ -42,15 +42,11 @@ echo "[NGINX] >> Creating NGINX configuration file..."
 cat > "$NGINX_CONFIG_FILE" << EOF
 server {
 
-	# Listen on port 443 for HTTPS connections. The server will use the specified SSL certificate and key for secure communication.
 	listen 443 ssl;
-
-	# Listen on IPv6 as well to support clients connecting over IPv6. This allows the server to accept connections from both IPv4 and IPv6 clients.
 	listen [::]:443 ssl;
 
 	server_name ${DOMAIN_NAME};
 
-	# Root directory for the server. NGINX will serve files from this directory when clients make requests to the server.
 	root /var/www/html;
 	index index.php index.html;
 
@@ -63,7 +59,6 @@ server {
 		try_files \$uri \$uri/ /index.php?\$args;
 	}
 
-	# This location block handles requests for PHP files. It forwards these requests to the PHP-FPM service defined by PHP_FPM_HOST on port 9000.
 	location ~ \.php$ {
 		include fastcgi_params;
 		fastcgi_pass ${PHP_FPM_HOST}:9000;
