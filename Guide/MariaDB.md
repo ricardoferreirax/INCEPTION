@@ -898,13 +898,17 @@ The outside world should never connect directly to MariaDB.
 
 ---
 
-# ENTRYPOINT
+# Understanding ENTRYPOINT
 
 ```Dockerfile
 ENTRYPOINT ["init_mariadb.sh"]
 ```
 
-``ENTRYPOINT`` defines the command executed every time the container starts.
+``ENTRYPOINT`` defines the command executed every time a container starts. Think of ENTRYPOINT as Container Startup Command.
+
+Whenever Docker creates a container from this image: Image -> Container -> ENTRYPOINT runs, the first thing executed becomes ``init_mariadb.sh``.
+
+The container becomes self-configuring.
 
 When Docker launches the MariaDB container, it automatically executes: ``init_mariadb.sh``.
 
@@ -912,7 +916,7 @@ This happens because the script was copied to: ``/usr/local/bin/init_mariadb.sh`
 
 > Container starts -> init_mariadb.sh runs -> MariaDB is configured -> MariaDB starts
 
-When a Docker launches the container, it executes init_mariadb.sh automatically. This is why the container becomes self-configuring. No manual intervention is required.
+When a Docker launches the container, it executes init_mariadb.sh automatically. This is why the container becomes self-configuring. No manual intervention is required. No manual intervention is required.
 
 ---
 
@@ -924,18 +928,48 @@ The last line of the script is:
 exec mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET"
 ```
 
-The ``exec`` command replaces the shell script process with MariaDB server process. 
+Normally:
+
+Shell
+ └── MariaDB
+
+would create two processes.
+
+The shell would remain running while MariaDB becomes a child process.
+
+With ``exec`` command the shell process is replaced with MariaDB server process. 
 
 After exec runs, the shell script disappears and mariadbd becomes the main process inside the container.
+The result becomes ``MariaDB``.
 
 This means: ``PID 1 = mariadbd``, inside the container.
 
-DOcker expects a single main process. This main process is always PID 1.
+Only one process remains.
 
-Docker containers are designed around one main foreground process.
+MariaDB takes over the PID of the shell.
 
-If PID 1 exits, the container stops. If mariadbd crashes, Docker detects that the main process exited.
-Then Docker can restart the container depending on the restart policy.
+## Understanding PID 1
+
+Every Linux process has a Process ID (PID).
+
+The first process inside a container always has: ``PID 1``.
+
+Docker expects the main application to be PID 1.
+
+Without exec:
+
+PID 1 = Shell
+PID 14 = MariaDB
+
+With exec:
+
+PID 1 = MariaDB
+
+This is important because Docker monitors PID 1.
+
+If PID 1 exits Container Stops.
+
+If MariaDB crashes: MariaDB Exits -> PID 1 Exits -> Container Exits -> Docker Detects Failure
 
 This is why MariaDB must run in foreground mode. It must not be started as a background daemon for the final container process.
 
