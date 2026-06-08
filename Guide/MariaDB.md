@@ -1,4 +1,4 @@
-# MariaDB Dockerfile — Complete Technical Explanation for Inception
+# MariaDB Dockerfile
 
 ## Dockerfile
 
@@ -25,9 +25,38 @@ ENTRYPOINT ["init_mariadb.sh"]
 
 This Dockerfile builds the custom MariaDB image used by the MariaDB service in the Inception project.
 
-Instead of downloading a pre-configured MariaDB image from Docker Hub, the entire service is built manually from a Debian base image. The image is built from Debian Bookworm and contains only the packages and files needed to run MariaDB inside the Inception Network. 
+To fully understand what this Dockerfile does, it is important to first understand what problem MariaDB solves and why a database server is required in a modern web application.
 
-This follows the Inception subject requirements and gives complete control over the installation, configuration, startup process, permissions, and security settings.
+WordPress is not a collection of static HTML pages. Instead, it is a dynamic application. Every time a visitor opens the website, WordPress generates the page dynamically by retrieving information stored inside a database.
+
+For example, when a user visits ``https://login.42.fr`` WordPress may need to retrieve:
+
+* website settings;
+* administrator information;
+* registered users;
+* blog posts;
+* comments;
+* uploaded content;
+* plugin settings;
+* theme settings.
+
+This information cannot simply be stored inside PHP files because it changes continuously.
+Instead, WordPress stores its data inside a relational database managed by MariaDB.
+
+MariaDB is a Database Management System (DBMS).
+
+A Database Management System is software designed to organize, store, retrieve, update and protect large amounts of structured information.
+
+Think of a database as a giant digital filing cabinet.
+Without MariaDB, WordPress would have to manually:
+
+* open files;
+* search for information;
+* update information;
+* protect data integrity;
+* recover from crashes.
+
+MariaDB performs all of these tasks automatically.
 
 The purpose of this image is to provide a database server that will store all WordPress data, including:
 
@@ -42,11 +71,119 @@ The purpose of this image is to provide a database server that will store all Wo
 
 Without MariaDB, WordPress would have nowhere to store persistent information.
 
-NGINX serves web requests.
+NGINX is responsible for handling incoming HTTP and HTTPS requests.
 
-WordPress generates dynamic content.
+WordPress is responsible for generating dynamic content.
 
-MariaDB stores the data used by WordPress.
+MariaDB is responsible for storing and retrieving data.
+
+Because each service specializes in a single task, the overall system becomes easier to maintain, more secure and more scalable.
+
+---
+
+### Understanding Docker Images
+
+Before MariaDB can run inside a container, Docker must first create an image.
+
+A Docker image can be thought of as a blueprint or template used to create containers.
+
+The image contains:
+
+* operating system files;
+* libraries;
+* installed software;
+* configuration files;
+* scripts.
+
+A container is simply a running instance of an image.
+
+The relationship can be visualized as: Dockerfile -> Docker Image -> Docker Container
+
+The Dockerfile contains instructions.
+Docker executes those instructions and creates an image.
+The image is then used to create containers.
+
+The image itself never runs.
+The container runs.
+
+An image is comparable to a class in programming.
+
+A container is comparable to an object created from that class.
+
+---
+
+### Understanding Filesystems
+
+Before MariaDB can be installed, Docker first needs an operating system environment.
+
+That environment includes one of the most fundamental components of any operating system: The ``Filesystem``.
+
+A filesystem is the structure used by an operating system to organize, store and retrieve files on a storage device.
+
+Without a filesystem, the operating system would have no way to know:
+
+* where files are stored;
+* how files are organized;
+* how directories relate to each other;
+* which users own which files.
+
+A filesystem solves this problem by organizing storage into a hierarchical structure of directories and files.
+
+For example:
+
+/
+├── bin
+├── etc
+├── home
+├── usr
+├── var
+└── tmp
+
+This structure is known as the Linux filesystem hierarchy.
+Every file inside Linux ultimately exists somewhere inside this tree.
+
+MariaDB itself stores its databases inside: ``/var/lib/mysql``.
+
+Configuration files are usually stored inside: ``/etc/mysql``.
+
+Temporary runtime files are stored inside: ``/run/mysqld``.
+
+One of Docker's most important features is filesystem isolation.
+When Docker starts a container, it creates a separate filesystem for that container.
+
+The container sees:
+
+/
+├── bin
+├── etc
+├── usr
+├── var
+└── ...
+
+just like a normal Linux machine.
+
+However, this filesystem is isolated from the host system.
+
+For example:
+
+Host: ``/home/rmedeiro``
+
+Container: ``/var/lib/mysql``
+
+The MariaDB container cannot automatically access files from the host machine.
+It only sees its own filesystem.
+
+This isolation improves:
+
+* security;
+* portability;
+* reliability.
+
+Each container behaves like a small independent Linux system.
+
+Even though multiple containers may run on the same machine, each one has its own filesystem, processes, network interfaces and runtime environment.
+
+This is one of the core ideas behind Docker and one of the reasons containers are so powerful.
 
 ---
 
@@ -56,39 +193,75 @@ MariaDB stores the data used by WordPress.
 FROM debian:bookworm
 ```
 
-Here, is defined the base image from which the MariaDB image will be built.
+This instruction defines the base image from which the MariaDB image will be built.
 
-Docker images are layered. Every image starts from another image.
+Instead of downloading a pre-configured MariaDB image from Docker Hub, the entire service is built manually from a Debian base image. The image is built from Debian Bookworm and contains only the packages and files needed to run MariaDB inside the Inception Network. 
 
-In this case: ``debian:bookworm`` means that the container image starts from ``Debian 12 (Bookworm)`` will be used as the operating system inside the container.
+This follows the Inception subject requirements and gives complete control over the installation, configuration, startup process, permissions, and security settings.
 
-We can think of this as installing a fresh Linux machine.
-Before MariaDB can exist, Docker needs:
+Every Docker image starts from another image.
+Images are layered.
 
-* a filesystem
-* libraries
-* package manager
-* shell
-* Linux utilities
+Each instruction in the Dockerfile creates a new layer on top of the previous one.
 
-Debian provides all of these. Debian gives the image a Linux filesystem, the Debian package manager apt, and the base environment needed to install MariaDB and the required system utilities.
+The first layer in this project is: ``debian:bookworm`` which corresponds to Debian 12 (Bookworm).
+
+Debian is one of the most widely used Linux distributions in the world.
+
+By using Debian Bookworm, the container gains:
+
+* a Linux kernel interface;
+* a filesystem hierarchy;
+* system libraries;
+* shell utilities;
+* package management through apt;
+* networking tools;
+* process management capabilities.
+
+Without these components, MariaDB could not be installed or executed.
+
+Every instruction that follows in the Dockerfile will be executed on top of this Debian environment.
+
+As a result, the final MariaDB image becomes:
+
+Debian
+   │
+   ├── MariaDB packages
+   ├── Configuration files
+   ├── Initialization script
+   └── Runtime settings
 
 ---
 
 ## Why Not Use the Official MariaDB Image?
 
-Because the subject explicitly requires building our own services.
+The Inception subject explicitly requires to build services instead of relying on pre-configured application images.
 
-Using: ``FROM mariadb`` would already include:
+At first glance, using the official MariaDB image may seem easier because it already contains everything required to run a database server. 
 
-* MariaDB
-* initialization scripts
-* entrypoints
-* configuration files
+For example: ``FROM mariadb`` would immediately provide:
 
-which defeats the educational purpose of the project.
+* MariaDB already installed;
+* default configuration files;
+* startup scripts;
+* entrypoints;
+* database initialization logic;
+* predefined filesystem structure.
 
-The goal of Inception is understanding how services are built and configured, not simply using pre-built containers.
+The container would be ready to run with very little work.
+However, the purpose of Inception is not simply running services.
+The purpose is understanding how those services are built, configured and managed.
+
+For example, we would not learn:
+
+* how MariaDB is installed;
+* which packages are required;
+* where database files are stored;
+* how initialization works;
+* how users and databases are created;
+* how permissions are configured;
+* how the startup sequence works;
+* how Docker entrypoints work.
 
 ---
 
