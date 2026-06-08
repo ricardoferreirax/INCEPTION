@@ -271,10 +271,23 @@ For example, we would not learn:
 RUN apt-get update && apt-get install -y mariadb-server && rm -rf /var/lib/apt/lists/*
 ```
 
-``RUN`` commands are executed only during image creation. They are not executed every time the container starts. The result of this command becomes part of the final image.
+This Dockerfile instruction installs MariaDB inside the custom MariaDB image.
 
-This instruction executes during image creation.
-It is executed only once: ``docker build``.
+It is one of the most important lines in the Dockerfile because this is the point where the image stops being only a basic Debian image and starts becoming a database server image.
+
+Before this line runs, the image is essentially just Debian Bookworm.
+
+After this line runs, the image contains the MariaDB server, MariaDB client tools, initialization tools, administration tools, default configuration files, libraries, dependencies, and system users required by MariaDB.
+
+``RUN`` is a Dockerfile instruction.
+It executes commands only during the image build process. They are not executed every time the container starts. The result of this command becomes part of the final image.
+This means the command runs when Docker is building the image, for example when you execute: ``docker build`` .
+
+A ``RUN`` command does not run every time the container starts.
+
+The Dockerfile builds the image.
+The container is created later from that image.
+So this instruction belongs to build time, not runtime.
 
 ---
 
@@ -284,14 +297,24 @@ It is executed only once: ``docker build``.
 apt-get update
 ```
 
-Debian stores package information in remote repositories.
-Before installing software, Debian must know:
+Debian uses the apt package manager to install software.
+However, apt does not automatically know what packages are available.
+It needs package lists.
 
-* what packages exist
-* where they are located
-* which versions are available
+Before installing anything, Debian needs to know:
 
-This command downloads the latest package repository indexes from Debian repositories. This allows apt to know which packages are available and where they can be downloaded from. Without this command: ``apt-get install mariadb-server``, may fail because Debian does not know where to find the package.
+* which packages exist;
+* which versions are available;
+* where they can be downloaded from;
+* which dependencies they require.
+
+apt-get update downloads this information. It does not install software. It only updates the local package index.
+
+For example, without apt-get update, this command: ``apt-get install -y mariadb-server`` may fail because Debian may not have an updated list of packages.
+
+So before installing MariaDB, we refresh the package information.
+
+This command downloads the latest package repository indexes from Debian repositories. This allows apt to know which packages are available and where they can be downloaded from.
 
 ---
 
@@ -301,19 +324,68 @@ This command downloads the latest package repository indexes from Debian reposit
 apt-get install -y mariadb-server
 ```
 
+This command installs the MariaDB server package. MariaDB is the database management system used by WordPress.
+WordPress needs a database because it stores dynamic data.
+
+Examples of WordPress data stored in MariaDB:
+
+* users;
+* posts;
+* pages;
+* comments;
+* site URL;
+* admin settings;
+* plugin settings;
+* theme settings.
+
+Without MariaDB, WordPress could still have PHP files, but it would not have persistent site data.
+It could not remember users, posts, settings or comments.
+
+The mariadb-server package installs the core software required to run a MariaDB database server.
+It also installs dependencies automatically.
+A dependency is another package required by the main package to work correctly.
+
 Installs the MariaDB database server and the tools required to initialize and run a database server.
 
-The package includes several important programs.
+The package installs several important programs and files.
+It does not only install one binary.
+It installs an entire database server environment.
+
+Important components include:
+
+mariadbd
+mariadb
+mariadb-install-db
+mariadb-admin
+system user mysql
+libraries
+
+Each one has a different role.
 
 ### mariadbd
 
-The ``MariaDB server daemon`` is the main database process that:
+Correspond to the MariaDB server ``daemon``.
+A daemon is a long-running background service.
+In normal Linux systems, daemons are services that continue running and wait for requests.
 
-* listens for connections
-* manages databases
-* authenticates users
-* executes SQL queries
-* stores data
+Examples:
+
+sshd       waits for SSH connections
+nginx      waits for HTTP/HTTPS requests
+mariadbd   waits for database connections
+
+In the container, mariadbd is the main database process.
+It is responsible for:
+
+* starting the database engine;
+* opening the configured port;
+* creating the socket file;
+* loading database files;
+* reading configuration files;
+* authenticating users;
+* executing SQL queries;
+* writing data to disk;
+* recovering data after crashes.
 
 This will eventually become PID 1 inside the container.
 
@@ -321,31 +393,52 @@ This will eventually become PID 1 inside the container.
 
 ### mariadb
 
-The ``MariaDB Client`` is a command-line tool. The ``init_mariadb.sh`` script can use it to connect to the temporary MariaDB server and execute SQL commands, such as, CREATE DATABASE, CREATE USER and GRANT.
+mariadb is the MariaDB client command-line tool.
+It is not the server.
+It is a program used to connect to the server.
+
+The relationship is:
 
 Example: ``mariadb -u root``
+
+This attempts to connect to the MariaDB server as the root database user.
+
+The ``init_mariadb.sh`` script can use it to connect to the temporary MariaDB server and execute SQL commands, such as, CREATE DATABASE, CREATE USER and GRANT.
 
 ---
 
 ### mariadb-install-db
 
-Creates the internal MariaDB system tables.
-These tables store:
+Is used to create the internal MariaDB system tables.
 
-* users accounts
-* privileges/permissions
-* database metadata
-* internal server data
+These are not WordPress tables.
+They are internal tables that MariaDB needs to operate.
 
-Without them MariaDB cannot function.
+They are stored inside: ``/var/lib/mysql/mysql``.
+This internal database contains information such as:
 
----
+* users;
+* passwords;
+* authentication plugins;
+* privileges;
+* host access rules;
+* database metadata.
 
-### mariadb-admin
+For example, when a user tries to connect, MariaDB must check:
 
-Is an administration tool used by the init script to stop the temporary MariaDB server safely.
+* Does this user exist?
+* Is the password correct?
+* Is this host allowed?
+* What permissions does this user have?
 
-Example: ``mariadb-admin shutdown``
+That information comes from internal system tables.
+Without these tables, MariaDB would not know:
+
+* who can connect;
+* which databases exist;
+* which permissions users have.
+
+So MariaDB cannot properly function without system tables.
 
 ---
 
@@ -355,19 +448,31 @@ Example: ``mariadb-admin shutdown``
 rm -rf /var/lib/apt/lists/*
 ```
 
-After installation, package indexes are no longer needed.
-Keeping them increases image size.
+This command removes the package lists downloaded by: ``apt-get update``.
+These files are stored in: ``/var/lib/apt/lists/``
 
-This removes the cached package lists created by apt-get update.
-This does not remove MariaDB. It only removes package index files that are no longer needed after installation.
+They are useful during package installation, but after MariaDB has been installed, they are no longer needed.
+Keeping them would make the Docker image larger.
+
+This does not remove MariaDB.
+
+It does not remove installed packages.
+
+It only removes temporary package index files.
+
+The result is a cleaner and smaller image.
 
 The goal is to reduce the final Docker image size and avoid keeping unnecessary apt cache data inside the image.
 
-Smaller images:
+Smaller Docker images are better because they:
 
-* build faster
-* transfer faster
-* use less storage
+* take less disk space;
+* build faster;
+* transfer faster;
+* reduce unnecessary files;
+* make the final project cleaner.
+
+A good Dockerfile should not keep unnecessary cache files inside the final image.
 
 ---
 
