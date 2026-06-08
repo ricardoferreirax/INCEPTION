@@ -724,17 +724,64 @@ Without correct ownership, the server could fail during startup because it canno
 COPY ./tools/init_mariadb.sh /usr/local/bin/init_mariadb.sh
 ```
 
-Copies the custom MariaDB initialization script into the image.
+This instruction copies the custom MariaDB initialization script from the project files into the Docker image.
 
-During the image build, Docker cannot automatically access files from the host. If a file is needed inside the image, it must be explicitly copied. This is exactly what the COPY instruction does. The source path: ``./tools/init_mariadb.sh`` is relative to the Docker build context. The destination: ``/usr/local/bin/init_mariadb.sh`` is inside the image filesystem.
+Without this script, the MariaDB container would contain the MariaDB software, but it would not know how to configure itself for the Inception project.
+
+To understand why this instruction is necessary, it is important to first understand the difference between the host machine, the Docker image, and the container.
+
+## Understanding Where Files Exist
+
+Before the image is built, the project files exist on the host machine.
+
+For example:
+
+INCEPTION/
+└── srcs/
+    └── requirements/
+        └── mariadb/
+            ├── Dockerfile
+            └── tools/
+                └── init_mariadb.sh
+
+This filesystem belongs to the host operating system.
+
+Docker images cannot automatically access files from the host.
+
+When Docker builds an image, it creates a completely separate filesystem.
+Think of it like creating a brand-new Linux machine.
+
+Initially, that machine knows nothing about the project files.
+
+The image initially contains only the files provided by Debian and the software installed during the build process.
+It does not automatically contain: ``init_mariadb.sh``.
+
+Therefore, if the container needs the script, Docker must explicitly copy it into the image.
+That is exactly what the ``COPY`` instruction does.
 
 After the image is built, the file exists inside the container exactly as if it had been created there manually.
+
+The script now permanently becomes part of the image.
+
+Every container created from this image will automatically contain the script.
+
 The directory: ``/usr/local/bin`` is traditionally used in Linux for custom executables installed by the administrator.
 Anything placed in this directory can usually be executed directly because it belongs to the system PATH.
 
 ---
 
-## Why Is This Script Needed?
+## Why Is This Script Needed? Why not configure MariaDB directly inside the Dockerfile?
+
+The answer is that Docker builds happen before the container exists.
+Many resources required by MariaDB do not exist yet during image creation.
+
+For example:
+ 
+* Docker Secrets do not exist.
+* Environment Variables do not exist.
+* Volumes do not exist.
+* Docker Networks do not exist.
+* Other Containers do not exist.
 
 Docker builds happen before:
 
@@ -763,8 +810,6 @@ The script performs all the runtime logic tasks such as:
 * starting the final MariaDB server in foreground mode.
 
 ---
-
-# Build Time vs Runtime
 
 ## Build Time
 
