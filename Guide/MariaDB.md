@@ -483,37 +483,67 @@ RUN mkdir -p /run/mysqld /var/lib/mysql && chown -R mysql:mysql /run/mysqld \
 	&& chown -R mysql:mysql /var/lib/mysql
 ```
 
-This prepares the MariaDB filesystem.
+This block prepares the filesystem that MariaDB will use inside the container.
+
+At this point in the Dockerfile, MariaDB has already been installed, but it still needs a place to store its data and runtime files.
+
+A database server cannot operate using only its executable files.
+
+It also needs directories where it can:
+
+* store databases;
+* store internal system tables;
+* create temporary files;
+* create communication sockets;
+* store process information.
+
+The purpose of this block is therefore to create the filesystem structure that MariaDB expects to find when it starts.
 
 ---
 
-# /var/lib/mysql
+## Understanding MariaDB Storage
+
+A common misconception is that MariaDB stores everything in memory.
+This is not true.
+MariaDB stores its data on disk.
+
+When WordPress creates:
+
+* a user;
+* a post;
+* a comment;
+* a page;
+
+that information must survive on container restarts and system reboots.
+
+To achieve this, MariaDB writes data into files stored on disk.
+Those files are located inside: ``/var/lib/mysql``.
+This directory is therefore one of the most important directories in the entire MariaDB installation.
+
+If this directory is lost, the database is lost.
+
+## Understanding /var/lib/mysql
 
 This is the MariaDB data directory. This directory is where MariaDB stores all persistent database files.
 
 Everything MariaDB stores ends up here.
 
-It can contains:
+Linux filesystems follow a standard hierarchy.
+The directory: ``/var`` stands for Variable Data.
+Variable data is information that changes while the system runs.
 
-* internal system tables;
-* user-created databases;
-* privilege information;
-* InnoDB files;
-* transaction logs;
-* metadata;
-* the initialization marker used by the script.
+Examples include:
 
-Example:
+* logs;
+* cache files;
+* databases;
 
-```text
-/var/lib/mysql
-│
-├── mysql/
-├── wordpress/
-├── ib_logfile0
-├── ib_logfile1
-└── .mariadb_ready
-```
+MariaDB data constantly changes because:
+
+* users are created;
+* posts are published;
+* comments are added;
+* settings are modified.
 
 In the Inception project, this directory is mounted as a Docker volume in docker-compose.yml.
 That means the database data persists even if the MariaDB container is destroyed and recreated.
@@ -525,88 +555,115 @@ the database from zero again.
 
 ## mysql/ 
 
-Contains MariaDB internal system tables. Stores:
+This directory contains the MariaDB internal system database.
 
-* users
-* passwords
-* privileges
-* metadata
+This database is created by: ``mariadb-install-db`` during initialization.
 
-Example:
+It contains critical information used by MariaDB itself.
 
-```sql
-SELECT * FROM mysql.user;
-```
+Examples include:
 
-This information comes from files stored here.
+* database users;
+* passwords;
+* permissions;
+* authentication settings;
+* internal metadata.
+
+Without these tables MariaDB cannot determine:
+
+* who is allowed to connect;
+* what databases exist;
+* what privileges each user has.
+
+This is why the script creates them during initialization.
 
 ---
 
 ## wordpress/
 
-Contains the WordPress database.
+This directory contains the WordPress database.
 
-Example:
+When WordPress creates tables such as:
 
-```text
-wordpress
-│
-├── wp_posts.ibd
-├── wp_users.ibd
-├── wp_comments.ibd
-└── ...
-```
+* wp_posts
+* wp_users
+* wp_comments
+* wp_options
+* wp_terms
 
-Every WordPress table eventually becomes files inside this directory.
+their data is stored inside files located here.
 
+For example: ``wp_users`` contains:
+
+* usernames;
+* emails;
+* password hashes;
+* roles.
+
+While: ``wp_posts`` contains:
+
+* blog posts;
+* pages;
+
+When a visitor loads the website, MariaDB retrieves information from these files and sends it back to WordPress.
 
 ---
 
-# /run/mysqld
+# Understanding /run/mysqld
 
-This is the MariaDB runtime directory. Runtime directories are used for temporary files that exist only while the service is running.
+Unlike /var/lib/mysql, this directory does not contain persistent data.
+It contains runtime data.
 
-Stores temporary files.
+Runtime data exists only while MariaDB is running. Think of it as MariaDB's temporary workspace.
 
-Example:
+Typical contents:
 
-```text
 /run/mysqld
 │
 ├── mysqld.sock
 └── mysqld.pid
-```
+
+When MariaDB stops, these files are no longer useful.
 
 ---
 
 ## mysqld.sock
 
+This file is a Unix socket. A Unix socket is a special file used for local communication between processes.
+
 Is the Unix socket used for local communication between the MariaDB client and the MariaDB server. 
 
-The socket is important because the initialization script uses commands like: ``mariadb --socket=/run/mysqld/mysqld.sock``.
-This allows the script to connect locally to the temporary MariaDB server without using the Docker network.
+It is not a network port. It acts as a communication endpoint.
 
-Allows local communication between:
+Example:
 
-```text
-  MariaDB Client
-        │
-        ▼
-   mysqld.sock
-        │
-        ▼
-  MariaDB Server
-```
+MariaDB Client -> mysqld.sock -> MariaDB Server
 
-This is faster than TCP because traffic never leaves the machine.
+The initialization script uses commands such as: ``mariadb --socket=/run/mysqld/mysqld.sock`` to allow the client to connect directly to MariaDB without using the Docker network.
+
+No Docker network is involved. No TCP connection is involved.
+
+Everything happens locally inside the container.
+
+### Why Use a Socket Instead of TCP?
+
+Sockets are:
+
+* faster;
+* simpler;
+* more secure for local communication.
+
+Instead of: 127.0.0.1:3306, the client connects directly through: ``/run/mysqld/mysqld.sock``.
+
+This avoids network overhead.
 
 ---
 
 ## mysqld.pid
 
-Contains the process ID.
+This file stores the process ID of the running MariaDB server.
 
-Is the PID file that stores the process ID of the running MariaDB server process.
+Other programs can read this file to know which process belongs to MariaDB.
 
 ---
 
@@ -618,12 +675,41 @@ chown -R mysql:mysql
 
 Changes the owner and group of /run/mysqld and /var/lib/mysql directories to mysql.
 
-This is necessary because MariaDB does not run as root. It runs as the mysql user.
+The command: ``chown`` stands for ``Change Owner``.
 
-In Linux, every file and directory has an owner, a group and permissions.
+Linux assigns every file and directory:
+
+* an owner;
+* a group;
+* permissions.
+
+## Why MariaDB Cannot Run As Root
+
+For security reasons, MariaDB normally runs as: ``mysql`` not ``root``.
+
+Running database servers as root would be dangerous because any vulnerability would gain full system privileges.
+
+Instead, MariaDB Process runs as mysql user. This limits what the process can access.
+
+## Why Ownership Is Required
+
+Suppose: ``/var/lib/mysql`` belongs to ``root:root`` but MariaDB runs as ``mysql:mysql``.
+
+Then MariaDB may not be allowed to:
+
+* create databases;
+* create tables;
+* write logs;
+* update files.
+
+By assigning ownership, MariaDB gains permission to manage its own files.
+
+So, this is necessary because MariaDB does not run as root. It runs as the mysql user.
 
 If /var/lib/mysql belonged only to root, then the MariaDB process running as mysql would not be able to write
-database files, create tables, update logs, or modify internal metadata. That would cause errors such as permission denied or failed to create file. That's why MariaDB must own /run/mysql and /var/lib/mysql. 
+database files, create tables, update logs, or modify internal metadata. 
+
+That would cause errors such as permission denied or failed to create file. That's why MariaDB must own /run/mysql and /var/lib/mysql. 
 
 The owner and group becomes mysql, and apply this recursively to every file and directory inside /var/lib/mysql.
 
