@@ -421,6 +421,54 @@ The goal is to understand the infrastructure behind WordPress.
 
 ---
 
+# What Is a Runtime Dependency?
+
+A runtime dependency is software that an application needs while it is running.
+
+For example, WordPress needs PHP while it is running because WordPress is written in PHP. Therefore PHP-FPM is a runtime dependency.
+
+WordPress also needs to connect to MariaDB while it is running. Therefore the PHP MySQL/MariaDB extension is a runtime dependency.
+
+This is different from a build-time dependency. A build-time dependency is only needed to build or prepare the image.
+
+A runtime dependency is needed when the container is actually executing.
+
+In this Dockerfile, the installed packages are runtime dependencies because the WordPress service needs them during container execution.
+
+---
+
+RUN is a Dockerfile instruction that executes commands during image build time. This means it runs when Docker builds the image, for example: ``docker compose build``. It does not run every time the container starts.
+
+When the container starts later, Docker does not reinstall php-fpm, php-mysql, mariadb-client, curl or ca-certificates.
+
+They are already part of the image.
+
+The image is like a prepared machine.
+
+The container is the running machine.
+
+The Dockerfile prepares the machine.
+
+The entrypoint script configures and starts the service.
+
+A clean separation is:
+
+Build time:
+    install packages
+    download WP-CLI
+    copy scripts
+    set permissions
+
+Runtime:
+    read secrets
+    validate environment variables
+    wait for MariaDB
+    install WordPress
+    create users
+    start PHP-FPM
+
+---
+
 # Installing WordPress Runtime Dependencies
 
 ```Dockerfile
@@ -428,15 +476,24 @@ RUN apt-get update && apt-get install -y php-fpm php-mysql mariadb-client curl \
 	ca-certificates && rm -rf /var/lib/apt/lists/*
 ```
 
-This instruction installs the packages needed for the WordPress container.
+This Dockerfile instruction installs the software required for the WordPress container to work correctly.
 
-Before this line runs, the image is only a Debian system.
+Before this line runs, the image is only a basic Debian Bookworm system. It has the Debian filesystem, the apt package manager, basic shell tools and system libraries, but it does not yet have the programs needed to run WordPress.
 
-After this line runs, the image has the tools required to execute WordPress PHP code, communicate with MariaDB and download WP-CLI.
+After this line runs, the image contains the main runtime dependencies required by the WordPress service:
 
-`RUN` commands execute during image build time. They do not run every time the container starts. This command belongs to build time because these packages must become part of the image.
+* php-fpm, used to execute PHP code;
+* php-mysql, used by PHP/WordPress to connect to MariaDB;
+* mariadb-client, used by the startup script to test the MariaDB connection;
+* curl, used to download WP-CLI;
+* ca-certificates, used to validate HTTPS certificates when downloading files securely.
 
----
+This line does not install WordPress itself.
+It installs the tools that allow WordPress to be downloaded, configured and executed later by the init_wordpress.sh script.
+
+A simplified view is:
+
+> Debian base image -> Install PHP-FPM -> Install PHP database extension -> Install MariaDB client -> Install curl and CA certificates -> Image is ready to configure WordPress at runtime
 
 ## apt-get update
 
@@ -465,25 +522,121 @@ Without it, the installation may fail because Debian may not know where to find 
 php-fpm
 ```
 
-This package installs PHP-FPM.
+The Dockerfile installs: ``php-fpm``.
 
-PHP-FPM means ``PHP FastCGI Process Manager``.
+PHP-FPM means: ``PHP FastCGI Process Manager``. 
 
-WordPress is written in PHP.
+PHP-FPM is a service that manages PHP worker processes. Its job is to receive requests for PHP execution, run the PHP code, and return the generated result.
 
-The browser cannot execute PHP.
+WordPress is written in PHP. The browser cannot execute PHP. NGINX cannot execute PHP by itself.
 
-NGINX cannot execute PHP by itself.
+PHP files must be executed by a PHP interpreter. PHP-FPM is the service responsible for receiving PHP requests and executing the PHP code.
 
-PHP files must be executed by a PHP interpreter.
+The relationship is: 
 
-PHP-FPM is the service responsible for receiving PHP requests and executing the PHP code.
-
-The relationship is: NGINX -> PHP-FPM -> WordPress PHP files
+> NGINX -> PHP-FPM -> WordPress PHP files
 
 When a request targets a PHP file, NGINX forwards the request to PHP-FPM using FastCGI.
 
 PHP-FPM executes WordPress and returns the generated result to NGINX.
+
+This is necessary because NGINX does not execute PHP by itself.
+
+### What PHP-FPM Actually Does
+
+PHP-FPM manages a pool of PHP worker processes.
+
+A worker process is a PHP process waiting to handle a request.
+
+When NGINX sends a PHP request, PHP-FPM assigns that request to an available worker.
+
+The worker:
+
+* loads the requested PHP file;
+* executes the PHP code;
+* lets WordPress connect to MariaDB if needed;
+* generates HTML;
+* returns the result to PHP-FPM;
+* PHP-FPM sends the response back to NGINX.
+
+A simplified diagram:
+
+```text
+NGINX
+  │
+  ▼
+PHP-FPM master process
+  │
+  ├── PHP worker 1
+  ├── PHP worker 2
+  └── PHP worker 3
+```
+
+The PHP-FPM master process manages workers. The workers execute PHP code. This is why the PHP-FPM configuration contains settings like:
+
+```text
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+```
+
+These settings control how many PHP worker processes may exist.
+
+### Why NGINX Cannot Execute PHP Alone
+
+NGINX is a web server. It is very good at:
+
+* receiving HTTP/HTTPS requests;
+* serving static files;
+* handling many connections efficiently;
+* handling TLS/SSL;
+* forwarding requests to other services.
+* managing many simultaneous connections.
+
+But NGINX is not a PHP interpreter. If NGINX receives a request for: ``/index.php`` it does not know how to execute PHP code by itself. It must pass the request to another process that understands PHP. That process is ``PHP-FPM``. So, NGINX forwards the PHP request to PHP-FPM.
+
+The flow is:
+
+> NGINX receives /index.php -> sends FastCGI request to PHP-FPM -> PHP-FPM executes WordPress PHP code -> PHP-FPM returns generated HTML -> NGINX sends HTML to the browser
+
+So PHP-FPM acts as the bridge between NGINX and PHP execution.
+
+### What Is FastCGI?
+
+FastCGI is a communication protocol.
+
+A protocol is a set of rules that defines how two programs exchange information.
+
+In this project: 
+
+NGINX communicates with PHP-FPM using FastCGI.
+
+NGINX receives an HTTP request from the browser.
+
+But NGINX does not send the exact same HTTP request to PHP-FPM.
+
+Instead, it translates the request into FastCGI parameters.
+
+For example, NGINX may send information such as:
+
+```text
+SCRIPT_FILENAME=/var/www/html/index.php
+REQUEST_METHOD=GET
+QUERY_STRING=
+SERVER_NAME=rickymercury.42.fr
+DOCUMENT_ROOT=/var/www/html
+```
+
+PHP-FPM receives this FastCGI request and knows which PHP file to execute.
+
+The most important parameter is: SCRIPT_FILENAME because it tells PHP-FPM the exact PHP file to run.
+
+Example:
+
+SCRIPT_FILENAME=/var/www/html/index.php. Then PHP-FPM executes that file. The output is returned to NGINX.
+NGINX then sends it back to the browser as an HTTP response.
 
 ---
 
@@ -493,17 +646,27 @@ PHP-FPM executes WordPress and returns the generated result to NGINX.
 php-mysql
 ```
 
-This package installs the PHP extension required to connect PHP applications to MySQL or MariaDB databases.
+This package installs the PHP extension that allows PHP applications to connect to MySQL-compatible databases, including MariaDB.
 
-WordPress must connect to MariaDB to retrieve and store dynamic content.
+WordPress needs this extension because almost all dynamic WordPress content is stored inside MariaDB.
 
-Without this extension, WordPress would not be able to use database functions.
+Examples:
 
-A typical error would be similar to:
+* users;
+* posts;
+* pages;
+* comments;
+* site title;
+* plugin settings;
+* theme settings.
+
+Without php-mysql, WordPress PHP code could execute, but it could not connect to the database.
+That would make WordPress unusable.
+A typical error would be:
 
 > Your PHP installation appears to be missing the MySQL extension which is required by WordPress.
 
-So this package is essential.
+So php-mysql is not optional. It is essential.
 
 It allows WordPress PHP code to communicate with MariaDB.
 
@@ -519,22 +682,35 @@ This package installs the MariaDB command-line client.
 
 The WordPress container does not run the MariaDB server. MariaDB runs in its own container.
 
-However, the WordPress initialization script needs a way to check whether MariaDB is ready.
+This package installs only the client tools, not the MariaDB server.
 
-For example, the script uses a command like:
+The WordPress container must not run the database server.
 
-```bash
+The database server belongs to the MariaDB container.
+
+However, the WordPress container still needs a way to test the MariaDB connection.
+
+That is why the client is installed.
+
+The script uses something like:
+
+```text
 mariadb -h "$MDB_HOST" -u "$MDB_USER" -p"$DB_PASSWORD" "$MDB_DATABASE" -e "SELECT 1"
 ```
 
-This command connects from the WordPress container to the MariaDB container.
+This command means:
 
-It tests whether:
+* Connect to host stored in MDB_HOST.
+* Use database user stored in MDB_USER.
+* Use password stored in DB_PASSWORD.
+* Select the database stored in MDB_DATABASE.
+* Execute SELECT 1.
 
-* the database host is reachable;
-* the user can authenticate;
-* the database exists;
-* MariaDB is ready to accept queries.
+It checks whether MariaDB is reachable and usable.
+This is important because Docker Compose depends_on only starts containers in order.
+It does not guarantee that MariaDB is fully ready.
+MariaDB may still be initializing when WordPress starts.
+So WordPress must wait until MariaDB accepts connections.
 
 Without `mariadb-client`, this readiness check would not work.
 
@@ -548,11 +724,13 @@ ca-certificates
 
 This package installs trusted Certificate Authority certificates.
 
-When `curl` connects to an HTTPS URL, it must verify that the remote server certificate is valid.
+When curl connects to an HTTPS URL, it must verify that the server certificate is valid.
 
-Without CA certificates, HTTPS downloads may fail with certificate verification errors.
+HTTPS uses certificates to prove that the remote server is really who it claims to be.
 
-Because WP-CLI is downloaded over HTTPS, this package is needed to make the download secure and reliable.
+Without ca-certificates, curl may fail with certificate verification errors.
+
+Since WP-CLI is downloaded through HTTPS, this package is needed for a secure and reliable download.
 
 ---
 
@@ -562,15 +740,22 @@ Because WP-CLI is downloaded over HTTPS, this package is needed to make the down
 rm -rf /var/lib/apt/lists/*
 ```
 
-This removes package index files downloaded by `apt-get update`.
+``apt-get update`` downloads package indexes into: ``/var/lib/apt/lists/``.
 
-These files are useful during installation but unnecessary after the packages are installed.
-
+These files are useful only during package installation.
+After the packages are installed, they are no longer needed.
 Removing them reduces the final image size.
 
-It does not remove installed packages.
+This does not remove installed packages.
+It only removes temporary apt cache data.
+The result is a cleaner image.
 
-It only removes apt cache data.
+Smaller images:
+
+* use less disk space;
+* build faster;
+* transfer faster;
+* contain less unnecessary data.
 
 ---
 
