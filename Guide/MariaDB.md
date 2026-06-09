@@ -131,6 +131,7 @@ A filesystem solves this problem by organizing storage into a hierarchical struc
 
 For example:
 
+```text
 /
 ├── bin
 ├── etc
@@ -138,6 +139,7 @@ For example:
 ├── usr
 ├── var
 └── tmp
+```
 
 This structure is known as the Linux filesystem hierarchy.
 Every file inside Linux ultimately exists somewhere inside this tree.
@@ -153,12 +155,14 @@ When Docker starts a container, it creates a separate filesystem for that contai
 
 The container sees:
 
+```text
 /
 ├── bin
 ├── etc
 ├── usr
 ├── var
 └── ...
+```
 
 just like a normal Linux machine.
 
@@ -224,12 +228,14 @@ Every instruction that follows in the Dockerfile will be executed on top of this
 
 As a result, the final MariaDB image becomes:
 
+```text
 Debian
    │
    ├── MariaDB packages
    ├── Configuration files
    ├── Initialization script
    └── Runtime settings
+```
 
 ---
 
@@ -618,10 +624,12 @@ Runtime data exists only while MariaDB is running. Think of it as MariaDB's temp
 
 Typical contents:
 
+```text
 /run/mysqld
 │
 ├── mysqld.sock
 └── mysqld.pid
+```
 
 When MariaDB stops, these files are no longer useful.
 
@@ -736,6 +744,7 @@ Before the image is built, the project files exist on the host machine.
 
 For example:
 
+```text
 INCEPTION/
 └── srcs/
     └── requirements/
@@ -743,6 +752,7 @@ INCEPTION/
             ├── Dockerfile
             └── tools/
                 └── init_mariadb.sh
+```
 
 This filesystem belongs to the host operating system.
 
@@ -904,19 +914,91 @@ The outside world should never connect directly to MariaDB.
 ENTRYPOINT ["init_mariadb.sh"]
 ```
 
-``ENTRYPOINT`` defines the command executed every time a container starts. Think of ENTRYPOINT as Container Startup Command.
+``ENTRYPOINT`` defines the command executed every time a container starts. ``ENTRYPOINT`` is the first command executed inside the container. 
 
-Whenever Docker creates a container from this image: Image -> Container -> ENTRYPOINT runs, the first thing executed becomes ``init_mariadb.sh``.
+``ENTRYPOINT`` is a Container Startup Command. Without ``ENTRYPOINT``, Docker would create the container, but nothing would happen.
 
-The container becomes self-configuring.
+As said before, Docker image is simply a template. We can think of it as a blueprint.
 
-When Docker launches the MariaDB container, it automatically executes: ``init_mariadb.sh``.
+For example:
 
-This happens because the script was copied to: ``/usr/local/bin/init_mariadb.sh`` and ``/usr/local/bin`` is normally in the PATH.
+```text
+Docker Image
+│
+├── Debian
+├── MariaDB installed
+├── Configuration files
+├── init_mariadb.sh
+└── Metadata
+```
 
-> Container starts -> init_mariadb.sh runs -> MariaDB is configured -> MariaDB starts
+The image contains files, software, configuration. But the image is not running. Nothing inside the image is executing. It is just data stored on disk.
 
-When a Docker launches the container, it executes init_mariadb.sh automatically. This is why the container becomes self-configuring. No manual intervention is required. No manual intervention is required.
+When Docker creates a container, Docker creates a running instance of that image. The container is the "living" version of the image.
+
+Image      → Contains MariaDB
+Container  → Runs MariaDB
+
+When we execute, for example, ``docker compose up``, Docker does not simply create the container and magically know what to run.
+
+It must know: ``What process should start first?``
+
+Every container needs an initial command. Without that command, Docker would create the container and immediately stop it because there would be no process keeping it alive. This is exactly what ``ENTRYPOINT`` defines.
+
+Whenever Docker starts the MariaDB container from this image: 
+
+Image -> Create Container -> Start Container -> Execute ENTRYPOINT -> Container Initialization Begins 
+
+The created container runs ``init_mariadb.sh`` before anything else happens. This script becomes the very first process executed inside the container.
+
+## Why Not Start MariaDB Directly?
+
+Why don't we simply do: ``ENTRYPOINT ["mariadbd"]`` instead of using a script?
+
+Because MariaDB cannot immediately start in the state required by the project.
+
+Before MariaDB starts, several things must happen.
+
+For example:
+
+* Read Docker Secrets
+* Validate Environment Variables
+* Create Directories
+* Set Permissions
+* Generate Configuration File
+* Create Database
+* Create User
+* Grant Privileges
+
+MariaDB itself cannot perform all these specific tasks. Therefore we need a preparation phase: ``init_mariadb.sh``.
+
+## Why Is The Container Self-Configuring?
+
+Without the script, every time a container starts we would have to manually enter it and execute commands.
+
+Imagine doing this: ``docker exec -it mariadb bash``, then ``mariadb-install-db`` then ``CREATE DATABASE wordpress;``, then ``CREATE USER ...``, 
+every single time.
+
+That would be completely against the purpose of Docker. Docker containers are supposed to be automated.
+
+A container should be able to start from zero and configure itself.
+
+This is exactly what your ENTRYPOINT script achieves. No manual intervention is required.
+
+## Why Docker Executes init_mariadb.sh Automatically
+
+Linux uses an environment variable called: ``PATH`` which contains directories where executables are searched.
+
+Example:
+
+```text
+/usr/local/bin
+/usr/bin
+/bin
+```
+
+When Docker sees: ``ENTRYPOINT ["init_mariadb.sh"]`` it searches PATH. Eventually it finds: ``/usr/local/bin/init_mariadb.sh``
+and executes it. That is why the full path is not required.
 
 ---
 
@@ -928,56 +1010,66 @@ The last line of the script is:
 exec mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET"
 ```
 
-Normally:
+Suppose the shell script starts MariaDB normally:
 
-Shell
- └── MariaDB
+The process tree becomes:
 
-would create two processes.
+```text
+Shell Script
+     │
+     └── MariaDB
+```
 
-The shell would remain running while MariaDB becomes a child process.
+or:
 
-With ``exec`` command the shell process is replaced with MariaDB server process. 
+```text
+PID 1  -> init_mariadb.sh
+PID 14 -> mariadbd
+```
 
-After exec runs, the shell script disappears and mariadbd becomes the main process inside the container.
-The result becomes ``MariaDB``.
+The shell remains alive. MariaDB becomes a child process.
+This seems harmless, but it creates several problems.
 
-This means: ``PID 1 = mariadbd``, inside the container.
+Docker expects the main application to be PID 1. Now the main process (mariadb) is not PID 1. The shell is.
 
-Only one process remains.
+As shell launches other programs, those programs become child processes.
 
-MariaDB takes over the PID of the shell.
+The same happens here. The script remains the parent and MariaDB becomes the child.
+
+So,  with ``exec`` command, this not happens. Does not create a child process. Instead, the shell process is replaced with MariaDB server process. 
+
+The process transformation becomes:
+
+Before: PID 1 -> init_mariadb.sh
+
+After: PID 1 -> mariadbd
+
+The shell disappears completely. MariaDB takes over the exact same PID.
+
+So, after exec runs, the shell script disappears and mariadbd becomes the main process inside the container.
+The result becomes ``MariaDB``. Only one process remains.
 
 ## Understanding PID 1
 
-Every Linux process has a Process ID (PID).
+Every Linux process has a Process ID (PID). PID 1 is special. In a normal Linux system, PID 1 is the first process started by the kernel. All other processes descend from PID 1.
 
-The first process inside a container always has: ``PID 1``.
+Containers work differently.VContainers do not run a complete operating system. Instead, Docker starts a single process.
 
-Docker expects the main application to be PID 1.
+That process becomes: PID 1 inside the container. For MariaDB container: ``PID 1 = mariadbd``. This is exactly what Docker expects.
 
-Without exec:
-
-PID 1 = Shell
-PID 14 = MariaDB
-
-With exec:
-
-PID 1 = MariaDB
-
-This is important because Docker monitors PID 1.
-
-If PID 1 exits Container Stops.
+This is important because Docker monitors PID 1. As long as PID 1 exists: ``Container = Running``, When PID 1 exits: ``Container = Stopped``.
+Docker cares whether PID 1 is alive.
 
 If MariaDB crashes: MariaDB Exits -> PID 1 Exits -> Container Exits -> Docker Detects Failure
 
-This is why MariaDB must run in foreground mode. It must not be started as a background daemon for the final container process.
+## Why MariaDB Must Run In Foreground Mode
 
-In summary:
- 
-1) ENTRYPOINT starts the initialization script
-2) The initialization script prepares MariaDB.
-3) exec replaces the script with the MariaDB server.
-4) MariaDB becomes PID 1 and keeps the container alive.
+Traditional Linux services usually run as daemons. When a service is started, it moves to the background. Docker does not work well with this model.
+
+Docker expects the main process to remain attached to the foreground.
+
+If MariaDB daemonizes itself: PID 1 Starts -> PID 1 Exits, Docker thinks the application has finished. The container stops immediately.
+
+That is why MariaDB must remain in the foreground. This allows Docker to monitor it directly.
 
 ---
