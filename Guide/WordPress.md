@@ -201,23 +201,6 @@ The flow is:
 
 So PHP-FPM acts as the bridge between NGINX and PHP execution.
 
-## WordPress Needs php-mysql
-
-The Dockerfile installs: ``php-mysql``.
-This package provides the PHP extension that allows PHP applications to communicate with MySQL databases, including MariaDB.
-
-WordPress needs this because the WordPress PHP code must connect to MariaDB.
-
-Without php-mysql, PHP would not have the necessary database driver. WordPress might fail with an error similar to:
-
-This package is the link between: PHP code -> MariaDB database
-
-When WordPress runs database operations, it uses PHP database functions internally. Those functions depend on the MySQL/MariaDB extension.
-
-Without this extension, WordPress can execute PHP code, but it cannot access the database.
-
-That would make WordPress unusable because almost all WordPress content is stored in MariaDB.
-
 ## WordPress Needs MariaDB
 
 WordPress depends heavily on MariaDB because most dynamic content is stored in the database.
@@ -263,37 +246,6 @@ In Docker Compose, ``/var/www/html`` should be mounted as a volume. This allows 
 Without persistence, WordPress could lose installed files, uploads, plugins and themes after rebuilds.
 
 ---
-
-# What Is FastCGI?
-
-FastCGI is a protocol used by a web server to communicate with an external application process.
-
-In this project, the web server is NGINX.
-
-The external application process is PHP-FPM.
-
-The protocol between them is FastCGI.
-
-A protocol is simply a set of rules that defines how two programs communicate.
-
-For example:
-
-```text
-HTTP -> browser communicates with web server
-SQL -> application communicates with database
-FastCGI -> NGINX communicates with PHP-FPM
-```
-
-FastCGI allows NGINX to say something like: Please execute this PHP file SCRIPT_FILENAME=/var/www/html/index.php
-
-PHP-FPM receives that request, executes the file, and returns the generated HTML output.
-
-NGINX does not need to know how PHP works internally.
-
-PHP-FPM does not need to handle HTTPS directly.
-
-Each one does its own job.
-
 
 # Understanding Filesystems
 
@@ -380,8 +332,6 @@ Debian
    └── Runtime configuration
 ```
 
----
-
 ## Why Not Use the Official WordPress Image?
 
 The Inception subject requires building services manually instead of using pre-configured service images.
@@ -421,54 +371,6 @@ The goal is to understand the infrastructure behind WordPress.
 
 ---
 
-# What Is a Runtime Dependency?
-
-A runtime dependency is software that an application needs while it is running.
-
-For example, WordPress needs PHP while it is running because WordPress is written in PHP. Therefore PHP-FPM is a runtime dependency.
-
-WordPress also needs to connect to MariaDB while it is running. Therefore the PHP MySQL/MariaDB extension is a runtime dependency.
-
-This is different from a build-time dependency. A build-time dependency is only needed to build or prepare the image.
-
-A runtime dependency is needed when the container is actually executing.
-
-In this Dockerfile, the installed packages are runtime dependencies because the WordPress service needs them during container execution.
-
----
-
-RUN is a Dockerfile instruction that executes commands during image build time. This means it runs when Docker builds the image, for example: ``docker compose build``. It does not run every time the container starts.
-
-When the container starts later, Docker does not reinstall php-fpm, php-mysql, mariadb-client, curl or ca-certificates.
-
-They are already part of the image.
-
-The image is like a prepared machine.
-
-The container is the running machine.
-
-The Dockerfile prepares the machine.
-
-The entrypoint script configures and starts the service.
-
-A clean separation is:
-
-Build time:
-    install packages
-    download WP-CLI
-    copy scripts
-    set permissions
-
-Runtime:
-    read secrets
-    validate environment variables
-    wait for MariaDB
-    install WordPress
-    create users
-    start PHP-FPM
-
----
-
 # Installing WordPress Runtime Dependencies
 
 ```Dockerfile
@@ -495,6 +397,43 @@ A simplified view is:
 
 > Debian base image -> Install PHP-FPM -> Install PHP database extension -> Install MariaDB client -> Install curl and CA certificates -> Image is ready to configure WordPress at runtime
 
+## What Is a Runtime Dependency?
+
+A runtime dependency is software that an application needs while it is running. For example, WordPress needs PHP while it is running because WordPress is written in PHP. Therefore PHP-FPM is a runtime dependency.
+
+WordPress also needs to connect to MariaDB while it is running. Therefore the PHP MySQL/MariaDB extension is a runtime dependency.
+
+This is different from a build-time dependency. A build-time dependency is only needed to build or prepare the image.
+
+A runtime dependency is needed when the container is actually executing.
+
+In this Dockerfile, the installed packages are runtime dependencies because the WordPress service needs them during container execution.
+
+``RUN`` is a Dockerfile instruction that executes commands during image build time. This means it runs when Docker builds the image, for example: ``docker compose build``. It does not run every time the container starts.
+
+When the container starts later, Docker does not reinstall php-fpm, php-mysql, mariadb-client, curl or ca-certificates.
+
+They are already part of the image. The image is like a prepared machine. The container is the running machine.
+The Dockerfile prepares the machine. The entrypoint script configures and starts the service.
+
+A clean separation is:
+
+```text
+Build time:
+    install packages
+    download WP-CLI
+    copy scripts
+    set permissions
+
+Runtime:
+    read secrets
+    validate environment variables
+    wait for MariaDB
+    install WordPress
+    create users
+    start PHP-FPM
+```
+
 ## apt-get update
 
 ```bash
@@ -514,14 +453,11 @@ These indexes tell Debian:
 
 Without it, the installation may fail because Debian may not know where to find packages such as `php-fpm` or `php-mysql`.
 
----
-
 ## php-fpm
 
 ```bash
 php-fpm
 ```
-
 The Dockerfile installs: ``php-fpm``.
 
 PHP-FPM means: ``PHP FastCGI Process Manager``. 
@@ -605,19 +541,11 @@ So PHP-FPM acts as the bridge between NGINX and PHP execution.
 
 ### What Is FastCGI?
 
-FastCGI is a communication protocol.
+FastCGI is a communication protocol used by a web server to communicate with an external application process.
 
 A protocol is a set of rules that defines how two programs exchange information.
 
-In this project: 
-
-NGINX communicates with PHP-FPM using FastCGI.
-
-NGINX receives an HTTP request from the browser.
-
-But NGINX does not send the exact same HTTP request to PHP-FPM.
-
-Instead, it translates the request into FastCGI parameters.
+In this project, the web server is NGINX. NGINX communicates with PHP-FPM using FastCGI. NGINX receives an HTTP request from the browser. But NGINX does not send the exact same HTTP request to PHP-FPM. Instead, it translates the request into FastCGI parameters.
 
 For example, NGINX may send information such as:
 
@@ -629,14 +557,14 @@ SERVER_NAME=rickymercury.42.fr
 DOCUMENT_ROOT=/var/www/html
 ```
 
-PHP-FPM receives this FastCGI request and knows which PHP file to execute.
-
-The most important parameter is: SCRIPT_FILENAME because it tells PHP-FPM the exact PHP file to run.
+PHP-FPM receives this FastCGI request and knows which PHP file to execute. The most important parameter is: SCRIPT_FILENAME because it tells PHP-FPM the exact PHP file to run.
 
 Example:
 
 SCRIPT_FILENAME=/var/www/html/index.php. Then PHP-FPM executes that file. The output is returned to NGINX.
 NGINX then sends it back to the browser as an HTTP response.
+
+So, The external application process is PHP-FPM and the protocol between them is FastCGI.
 
 ---
 
@@ -646,10 +574,8 @@ NGINX then sends it back to the browser as an HTTP response.
 php-mysql
 ```
 
-This package installs the PHP extension that allows PHP applications to connect to MySQL-compatible databases, including MariaDB.
-
+This package installs the PHP extension that allows PHP applications to connect to MySQL databases, including MariaDB.
 WordPress needs this extension because almost all dynamic WordPress content is stored inside MariaDB.
-
 Examples:
 
 * users;
@@ -660,8 +586,7 @@ Examples:
 * plugin settings;
 * theme settings.
 
-Without php-mysql, WordPress PHP code could execute, but it could not connect to the database.
-That would make WordPress unusable.
+Without php-mysql, PHP would not have the necessary database driver. WordPress PHP code could execute, but it could might failt and not connect to the database. That would make WordPress unusable because almost all WordPress content is stored in MariaDB.
 A typical error would be:
 
 > Your PHP installation appears to be missing the MySQL extension which is required by WordPress.
@@ -669,8 +594,6 @@ A typical error would be:
 So php-mysql is not optional. It is essential.
 
 It allows WordPress PHP code to communicate with MariaDB.
-
----
 
 ## mariadb-client
 
@@ -713,8 +636,6 @@ MariaDB may still be initializing when WordPress starts.
 So WordPress must wait until MariaDB accepts connections.
 
 Without `mariadb-client`, this readiness check would not work.
-
----
 
 ## ca-certificates
 
@@ -824,21 +745,39 @@ The `-O` option tells `curl` to save the downloaded file using its original file
 
 ## What Is A PHAR File?
 
-The downloaded file is: ``wp-cli.phar``. ``PHAR`` stands for: ``PHP Archive``.
+The downloaded file is ``wp-cli.phar``. ``PHAR`` means ``PHP Archive``.
 
-A PHAR file bundles many PHP files into a single executable package. Instead of distributing hundreds of files:
+A PHAR file is a special archive format used by PHP. It allows many PHP files to be packaged together into one single file.
+
+Normally, a PHP application can be made of many files and directories. For example, without PHAR, WP-CLI could be distributed like this:
 
 ```text
 wp-cli/
-├── file1.php
-├── file2.php
-├── file3.php
-└── ...
+├── commands/
+│   ├── core.php
+│   ├── config.php
+│   ├── user.php
+│   └── plugin.php
+├── framework/
+│   ├── bootstrap.php
+│   ├── runner.php
+│   └── dispatcher.php
+├── vendor/
+│   └── dependencies/
+└── wp-cli.php
 ```
 
-all code is packed into: ``wp-cli.phar``. This makes distribution easier.
+This would be harder to distribute because the whole directory structure would need to be downloaded, copied, preserved and executed correctly.
 
-The entire WP-CLI application exists inside this single file.
+A PHAR solves this by compressing and packaging the entire application into one file ``wp-cli.phar``.
+So instead of managing hundreds or thousands of separate PHP files, the container only needs one executable archive.
+
+This makes installation much simpler inside Docker. The Dockerfile only needs to download one file. That single file contains the entire ``WP-CLI`` application.
+
+So, in this project, ``wp-cli.phar`` = complete ``WP-CLI application in one executable PHP archive``.
+
+This is why WP-CLI is easy to install in the Dockerfile.
+
 
 ## Making WP-CLI Executable
 
@@ -846,17 +785,40 @@ The entire WP-CLI application exists inside this single file.
 chmod +x wp-cli.phar
 ```
 
-Linux files have permissions. A file can have:
+After the file is downloaded, Linux sees it as a normal file. Even if the file contains executable code, Linux will not automatically allow it to be executed as a command.
 
-* read permission;
-* write permission;
-* execute permission.
+Linux files have permissions. Each file can have permissions for:
 
-The operating system refuses to run such a file as a command. 
+* the owner;
+* the group;
+* others.
 
-Adding execute permission: ``chmod +x``, Linux recognizes it as an executable file.
+The main permission types are:
 
-Without this step, ``./wp-cli.phar`` would fail with ``Permission denied``.
+* read (r);
+* write (w);
+* execute (x).
+
+For example:
+
+```text
+read     -> allows opening and reading the file
+write    -> allows modifying the file
+execute  -> allows running the file as a program
+```
+
+A file may look like this: ``-rw-r--r--`` . This means the file can be read and written by the owner, and read by others, but it cannot be executed.
+
+If we tried to run it: ``./wp-cli.phar``, Linux could refuse with Permission denied because the executable bit is missing.
+
+The command ``chmod +x wp-cli.phar`` adds execute permission.
+
+After this, the file may look like: ``-rwxr-xr-x``. Now Linux is allowed to execute it.
+
+This step is necessary because the Dockerfile later wants WP-CLI to behave like a real command.
+
+Without chmod +x, the file would exist in the image, but it could not be used directly as an executable program.
+
 
 ## Moving WP-CLI Into The PATH
 
@@ -864,20 +826,36 @@ Without this step, ``./wp-cli.phar`` would fail with ``Permission denied``.
 mv wp-cli.phar /usr/local/bin/wp
 ```
 
-This command performs moves the wp-cli.phar file and renames it.
+This command moves the file from the current directory into ``/usr/local/bin`` and renames it from ``wp-cli.phar`` to ``wp``. So after this command, ``wp-cli.phar`` becomes ``/usr/local/bin/wp``.
 
-Linux uses PATH which contains directories where executable programs are searched.
+This is important because ``/usr/local/bin`` is normally included in the Linux PATH. PATH is an environment variable used by the shell to find commands.
 
-Since ``/usr/local/bin`` belongs to PATH, moving wp-cli.phar into that path, we rename it to ``wp`` so when we run ``wp`` command, Linux searches the PATH directories and now this file works from anywhere and the script can run from anywhere inside the container: 
+For example, when we type ``ls``, Linux does not magically know where ``ls`` is. It searches through the directories listed in PATH: ``/usr/local/bin:/usr/bin:/bin``. This means: search ``/usr/local/bin``, then search ``/usr/bin``, then search ``/bin``.
 
-```bash
-wp core download
-wp config create
-wp core install
-wp user create
+So when the script runs ``wp core download``, Linux searches for a program called ``wp``.
+
+Since the Dockerfile moved ``WP-CLI`` to ``/usr/local/bin/wp``, Linux finds it immediately.
+
+This allows the script to run:
+
+* wp core download
+* wp config create
+* wp core install
+* wp user create
+
+from anywhere inside the container.
+
+Without moving WP-CLI into PATH, the script would need to execute it using a full path, for example:
+
+```text
+/usr/local/bin/wp core download
+
+or:
+
+php /some/path/wp-cli.phar core download
 ```
 
-So, after execution, ``wp-cli.phar`` becomes ``/usr/local/bin/wp``.
+Moving it into ``/usr/local/bin/wp`` makes the script cleaner and easier to read.
 
 ---
 
@@ -886,26 +864,37 @@ So, after execution, ``wp-cli.phar`` becomes ``/usr/local/bin/wp``.
 ```Dockerfile
 RUN mkdir -p /var/www/html /run/php && chown -R www-data:www-data /var/www/html /run/php
 ```
+
 This block prepares the filesystem required by WordPress and PHP-FPM.
 
-Before WordPress can run, Linux needs places where files can be stored.
+At this point, the image already has PHP-FPM and WP-CLI installed, but it still needs the directories where WordPress and PHP-FPM will operate.
 
-Think of WordPress as a complete application. Applications need directories for:
+Applications do not run only from binaries. They also need places to store:
 
-* source code;
+* application files;
 * configuration files;
-* uploaded files;
+* uploaded content;
 * runtime files;
-* logs;
-* temporary files.
+* temporary files;
+* process information.
 
-This instruction creates those locations.
+This Dockerfile creates two important directories:
+
+```text
+/var/www/html
+/run/php
+```
+
+Then it changes their ownership to: ``www-data:www-data``.
+
+This is important because PHP-FPM will run WordPress as the ``www-data user``.
+
 
 ## Understanding /var/www/html
 
-``/var/www/html`` is the traditional Linux WordPress web root directory.
+``/var/www/html`` is the WordPress web root directory. A web root is the directory that contains website files. For WordPress, this directory becomes the main application directory. Think of it as the main folder of the website. Everything that makes WordPress exist lives here.
 
-A web root is the directory from which a web server serves website files. Think of it as the main folder of the website. Everything that makes WordPress exist lives here.
+When WP-CLI downloads WordPress, it places the WordPress files here.
 
 After installation:
 
@@ -920,29 +909,59 @@ After installation:
 └── hundreds of WordPress files
 ```
 
-## index.php
+### index.php
 
-This is the entry point of WordPress.
+Is the main entry point of WordPress.
 
-Almost every request eventually reaches ``index.php`` which loads WordPress.
+When a request reaches WordPress, it usually passes through this file.
 
+Its job is to load the WordPress environment and start the request processing.
 
-## wp-config.php
+> Request arrives -> index.php -> Load WordPress core -> Connect to database -> Generate final page
 
-This file contains WordPress configuration.
+Without index.php, WordPress would not have a normal starting point for handling web requests.
 
-Most importantly:
+### wp-config.php
+
+Is the main WordPress configuration file. It is created by ``wp config create``.
+
+This file contains the database connection settings. Most importantly:
 
 * DB_NAME
 * DB_USER
 * DB_PASSWORD
 * DB_HOST
 
-Without it WordPress cannot connect to MariaDB.
+These values tell WordPress how to connect to MariaDB. For example:
 
-This file acts as the bridge between: WordPress and MariaDB.
+```text
+DB_NAME      -> wordpress
+DB_USER      -> rmedeiro
+DB_PASSWORD  -> loaded from Docker secret
+DB_HOST      -> mariadb
+```
 
-## wp-content
+This file is the bridge between WordPress and MariaDB. Without it, WordPress would not know which database to use.
+
+If ``wp-config.php`` is missing, WordPress behaves as if it is not configured yet.
+
+That is why the script can use it as an installation marker. If this file exists, WordPress has already been configured. If it does not exist, the script installs WordPress.
+
+### wp-admin/
+
+Contains the WordPress administration dashboard. This is what allows the administrator to manage the website through the browser.
+
+For example, ``https://rmedeiro.42.fr/wp-admin`` uses files from this directory.
+
+It contains the PHP files responsible for:
+
+* dashboard pages;
+* user management;
+* plugin management;
+* theme management;
+* settings pages.
+
+### wp-content
 
 It contains:
 
@@ -955,32 +974,30 @@ User-generated content lives here.
 
 ## Why Is /var/www/html Mounted As A Volume?
 
-Inside Docker Compose:
+In Docker, container files are normally temporary. If the container is removed, files created inside the container can disappear unless they are stored in a volume.
 
-This ensures persistence.
+WordPress files must persist.
 
-Without a volume:
+For example, WordPress may create:
 
-Container deleted
-      │
-      ▼
-All WordPress files disappear
+* wp-config.php;
+* uploaded images;
+* installed plugins;
+* installed themes;
+* generated cache files.
 
-With a volume:
+If /var/www/html were not mounted as a volume, deleting and recreating the WordPress container could remove these files.
 
-Container deleted
-      │
-      ▼
-Files remain on disk
+This is why the compose file mounts the WordPress volume into ``/var/www/html``.
 
-This is critical because WordPress installations must survive container recreation.
+The container can be recreated while the WordPress files remain available.
+
 
 ## Understanding /run/php
 
-``/run/php`` is the PHP-FPM runtime directory.
+``/run/php`` is the runtime directory used by PHP-FPM.
 
-Runtime means files that only exist while the service is running.
-
+Runtime files are files that exist only while a service is running. They are not permanent application data.
 Typical contents:
 
 ```text
@@ -991,11 +1008,23 @@ Typical contents:
 └── temporary files
 ```
 
-These files are not application data. They only help PHP-FPM operate.
+### PID Files
 
-When the container stops, runtime files disappear, which is completely normal.
+A PID file stores the process ID of a running service. For example, ``php-fpm.pid`` may contain ``1``.
+This means PHP-FPM is running as process 1.
 
-They exist only while PHP-FPM is running.
+System tools can use this information to identify the service process.
+
+### Socket Files
+
+A socket file is a special file used for communication between processes.
+
+Some PHP-FPM configurations use a Unix socket such as ``/run/php/php-fpm.sock``.
+
+The configuration listens on TCP: ``0.0.0.0:9000``, so NGINX connects using the Docker network instead of a Unix socket.
+
+Still, /run/php is a standard runtime directory for PHP-FPM and should exist.
+
 
 ## www-data Ownership
 
@@ -1003,19 +1032,39 @@ They exist only while PHP-FPM is running.
 chown -R www-data:www-data /var/www/html /run/php
 ```
 
-Changes owner and group to `www-data`.
+This command changes ownership of the WordPress and PHP-FPM runtime directories.
 
-Linux does not run everything as root. Services usually run using dedicated users.
-
-Examples:
+``www-data`` is the standard user used by web services as PHP-FPM, which  runs as ``www-data``, according to the pool configuration:
 
 ```text
-mysql     -> MariaDB
-nginx     -> NGINX
-www-data  -> Web Applications
+user = www-data
+group = www-data
 ```
 
-PHP-FPM executes WordPress as ``www-data`` not as root.
+This means WordPress PHP code is executed by the ``www-data`` user. Therefore, the files WordPress needs to read and write must be accessible to ``www-data``.
+
+So, PHP-FPM executes WordPress as ``www-data`` not as root.
+
+### Why Not Run as root?
+
+Running PHP-FPM as root would be dangerous. If a PHP vulnerability were exploited, the attacker could gain root-level access inside the container. By running as www-data, the process has limited permissions.
+
+This follows the principle of least privilege.
+
+A service should only have the permissions it needs.
+
+### Why Permissions Matter in WordPress
+
+WordPress needs to write files in several situations. For example:
+
+* creating wp-config.php;
+* uploading media;
+* installing plugins;
+* installing themes;
+* writing cache files;
+* updating files.
+
+If these directories belonged to root, PHP-FPM might not be able to modify them.
 
 Imagine ``wp-content/uploads`` belongs to ``root`` but PHP-FPM runs as ``www-data``, and now a user uploads an image. WordPress tries to create a file inside ``wp-content/uploads``. Linux checks permissions. Linux sees ``www-data`` is not the owner. Result: Permission denied. Upload fails.
 This is why ownership is critical.
@@ -1041,7 +1090,7 @@ Before: root:root /var/www/html
 After: www-data:www-data /var/www/html
 ```
 
-This allows PHP-FPM to:
+This gives PHP-FPM the correct ownership over the files it needs to manage:
 
 * create files;
 * modify files;
@@ -1051,7 +1100,7 @@ This allows PHP-FPM to:
 * update themes;
 * generate cache files.
 
-Without this ownership configuration, many WordPress features would break.
+Without this ownership configuration, WordPress might install successfully but fail later when trying to upload files or modify content.
 
 ---
 
