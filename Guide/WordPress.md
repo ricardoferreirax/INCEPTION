@@ -766,17 +766,48 @@ RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli
 	&& chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp
 ```
 
-This instruction installs WP-CLI.
+This instruction installs ``WP-CLI``, the official command-line interface for WordPress.
 
-WP-CLI is the command-line interface for WordPress.
+## What Is WP-CLI?
 
-It allows the container to install and configure WordPress automatically.
+WP-CLI stands for: ``WordPress Command Line Interface``. It is a tool that allows WordPress to be managed entirely from the terminal.
 
-Without WP-CLI, WordPress would usually be installed manually through the browser.
+Normally, when installing WordPress manually, a person must open the browser and complete the installation page.
+This works on a traditional server but creates problems inside Docker.
 
-In Inception, automatic installation is preferred because containers should be reproducible and self-configuring.
+Docker containers are supposed to be:
 
----
+* automatic;
+* reproducible;
+* self-configuring;
+* deployable without human interaction.
+
+Imagine recreating WordPress container ten times. If each container required manually opening the browser and completing the installer again, automation would be impossible. ``WP-CLI`` solves this problem.
+
+Instead of using a browser, ``wp core install`` can perform the entire installation automatically.
+
+## Why Is WP-CLI Important In Inception?
+
+The Inception project is heavily focused on automation.
+
+When the WordPress container starts, the initialization script must be capable of:
+
+* downloading WordPress;
+* generating wp-config.php;
+* connecting WordPress to MariaDB;
+* installing the site;
+* creating the administrator account;
+* creating additional users.
+
+WP-CLI makes all of this possible.
+
+Without WP-CLI the script would have no easy way to configure WordPress automatically.
+
+The startup sequence becomes:
+
+> Container Starts -> init_wordpress.sh -> WP-CLI Downloads WordPress -> WP-CLI Creates wp-config.php -> WP-CLI Installs WordPress -> WP-CLI Creates Users -> PHP-FPM Starts
+
+This is why WP-CLI is one of the most important tools in the WordPress container.
 
 ## Downloading WP-CLI
 
@@ -784,41 +815,60 @@ In Inception, automatic installation is preferred because containers should be r
 curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
 ```
 
-Downloads the WP-CLI PHAR file.
+This command downloads the ``WP-CLI PHAR`` file. A PHAR file is a ``PHP archive``.
+It bundles ``PHP code`` into a single executable file.
 
-A PHAR file is a PHP archive.
+The download happens during image build time.
 
-It bundles PHP code into a single executable file.
+The `-O` option tells `curl` to save the downloaded file using its original filename: ``wp-cli.phar``.
 
-The `-O` option tells `curl` to save the downloaded file using the same filename as the remote file:
+## What Is A PHAR File?
+
+The downloaded file is: ``wp-cli.phar``. ``PHAR`` stands for: ``PHP Archive``.
+
+A PHAR file bundles many PHP files into a single executable package. Instead of distributing hundreds of files:
 
 ```text
-wp-cli.phar
+wp-cli/
+├── file1.php
+├── file2.php
+├── file3.php
+└── ...
 ```
 
----
+all code is packed into: ``wp-cli.phar``. This makes distribution easier.
 
-## chmod +x
+The entire WP-CLI application exists inside this single file.
+
+## Making WP-CLI Executable
 
 ```bash
 chmod +x wp-cli.phar
 ```
 
-Makes the downloaded file executable.
+Linux files have permissions. A file can have:
 
-Without this permission, Linux would not allow it to be run as a command.
+* read permission;
+* write permission;
+* execute permission.
 
----
+The operating system refuses to run such a file as a command. 
 
-## mv wp-cli.phar /usr/local/bin/wp
+Adding execute permission: ``chmod +x``, Linux recognizes it as an executable file.
+
+Without this step, ``./wp-cli.phar`` would fail with ``Permission denied``.
+
+## Moving WP-CLI Into The PATH
 
 ```bash
 mv wp-cli.phar /usr/local/bin/wp
 ```
 
-Moves WP-CLI into `/usr/local/bin` and renames it to `wp`.
+This command performs moves the wp-cli.phar file and renames it.
 
-Because `/usr/local/bin` is normally in the PATH, the script can run:
+Linux uses PATH which contains directories where executable programs are searched.
+
+Since ``/usr/local/bin`` belongs to PATH, moving wp-cli.phar into that path, we rename it to ``wp`` so when we run ``wp`` command, Linux searches the PATH directories and now this file works from anywhere and the script can run from anywhere inside the container: 
 
 ```bash
 wp core download
@@ -827,7 +877,7 @@ wp core install
 wp user create
 ```
 
-from anywhere inside the container.
+So, after execution, ``wp-cli.phar`` becomes ``/usr/local/bin/wp``.
 
 ---
 
@@ -836,58 +886,116 @@ from anywhere inside the container.
 ```Dockerfile
 RUN mkdir -p /var/www/html /run/php && chown -R www-data:www-data /var/www/html /run/php
 ```
+This block prepares the filesystem required by WordPress and PHP-FPM.
 
-This block prepares the filesystem needed by WordPress and PHP-FPM.
+Before WordPress can run, Linux needs places where files can be stored.
 
----
+Think of WordPress as a complete application. Applications need directories for:
 
-## /var/www/html
+* source code;
+* configuration files;
+* uploaded files;
+* runtime files;
+* logs;
+* temporary files.
 
-This is the WordPress web root.
+This instruction creates those locations.
 
-It is where WordPress files are stored.
+## Understanding /var/www/html
 
-After installation, it contains:
+``/var/www/html`` is the traditional Linux WordPress web root directory.
+
+A web root is the directory from which a web server serves website files. Think of it as the main folder of the website. Everything that makes WordPress exist lives here.
+
+After installation:
 
 ```text
 /var/www/html
+│
 ├── index.php
 ├── wp-config.php
 ├── wp-admin/
 ├── wp-content/
-└── wp-includes/
+├── wp-includes/
+└── hundreds of WordPress files
 ```
 
-`wp-content` is especially important because it contains:
+## index.php
 
-* themes;
-* plugins;
-* uploads;
-* cache files.
+This is the entry point of WordPress.
 
-In Inception, `/var/www/html` is mounted as a Docker volume.
+Almost every request eventually reaches ``index.php`` which loads WordPress.
 
-This makes WordPress files persistent.
 
-If the container is deleted and recreated, the files remain in the volume.
+## wp-config.php
 
----
+This file contains WordPress configuration.
 
-## /run/php
+Most importantly:
 
-This is the PHP-FPM runtime directory.
+* DB_NAME
+* DB_USER
+* DB_PASSWORD
+* DB_HOST
 
-It may contain runtime files such as:
+Without it WordPress cannot connect to MariaDB.
 
-* PID files;
-* socket files;
-* temporary service files.
+This file acts as the bridge between: WordPress and MariaDB.
 
-Runtime files are not persistent application data.
+## wp-content
+
+It contains:
+
+* Themes
+* Plugins
+* Uploads
+* Cache files
+
+User-generated content lives here.
+
+## Why Is /var/www/html Mounted As A Volume?
+
+Inside Docker Compose:
+
+This ensures persistence.
+
+Without a volume:
+
+Container deleted
+      │
+      ▼
+All WordPress files disappear
+
+With a volume:
+
+Container deleted
+      │
+      ▼
+Files remain on disk
+
+This is critical because WordPress installations must survive container recreation.
+
+## Understanding /run/php
+
+``/run/php`` is the PHP-FPM runtime directory.
+
+Runtime means files that only exist while the service is running.
+
+Typical contents:
+
+```text
+/run/php
+│
+├── php-fpm.pid (PID files)
+├── php-fpm.sock (socket files)
+└── temporary files
+```
+
+These files are not application data. They only help PHP-FPM operate.
+
+When the container stops, runtime files disappear, which is completely normal.
 
 They exist only while PHP-FPM is running.
-
----
 
 ## www-data Ownership
 
@@ -897,19 +1005,53 @@ chown -R www-data:www-data /var/www/html /run/php
 
 Changes owner and group to `www-data`.
 
-PHP-FPM runs as the `www-data` user.
+Linux does not run everything as root. Services usually run using dedicated users.
 
-Therefore WordPress files must be accessible by `www-data`.
+Examples:
 
-If files belonged only to root, WordPress could fail when trying to:
+```text
+mysql     -> MariaDB
+nginx     -> NGINX
+www-data  -> Web Applications
+```
 
-* create `wp-config.php`;
+PHP-FPM executes WordPress as ``www-data`` not as root.
+
+Imagine ``wp-content/uploads`` belongs to ``root`` but PHP-FPM runs as ``www-data``, and now a user uploads an image. WordPress tries to create a file inside ``wp-content/uploads``. Linux checks permissions. Linux sees ``www-data`` is not the owner. Result: Permission denied. Upload fails.
+This is why ownership is critical.
+
+``chown -R www-data:www-data`` means:
+
+```text
+Owner  -> www-data
+Group  -> www-data
+```
+
+The option -R means recursive, which apply the change to:
+
+* every directory;
+* every file;
+* every subdirectory.
+
+Example:
+
+```text
+Before: root:root /var/www/html
+
+After: www-data:www-data /var/www/html
+```
+
+This allows PHP-FPM to:
+
+* create files;
+* modify files;
+* delete files;
 * upload images;
 * install plugins;
 * update themes;
-* write cache files.
+* generate cache files.
 
-This ownership ensures PHP-FPM can read and write the files it needs.
+Without this ownership configuration, many WordPress features would break.
 
 ---
 
