@@ -1110,11 +1110,68 @@ Without this ownership configuration, WordPress might install successfully but f
 COPY ./tools/init_wordpress.sh /usr/local/bin/init_wordpress.sh
 ```
 
-Copies the custom WordPress initialization script into the image.
+This instruction copies the custom WordPress initialization script from the project directory into the Docker image.
 
-Without this script, the container would contain PHP-FPM and WP-CLI, but it would not know how to configure WordPress for the project.
+At this point in the Dockerfile, the image already contains the basic tools needed to run WordPress:
 
-The script performs runtime tasks such as:
+* PHP-FPM;
+* PHP MySQL/MariaDB extension;
+* MariaDB client;
+* curl;
+* CA certificates;
+* WP-CLI.
+
+However, having these tools installed is not enough. The container still needs to know how to use them when it starts.
+
+That is the role of ``init_wordpress.sh``.
+
+The Dockerfile installs the tools. The initialization script uses those tools to configure the service.
+
+A useful way to think about it is:
+
+```text
+Dockerfile
+    prepares the image
+
+init_wordpress.sh
+    prepares the running container
+```
+
+## Why the Script Must Be Copied Into the Image
+
+Before the image is built, the script exists only on the host machine.
+
+For example:
+
+```text
+INCEPTION/
+└── srcs/
+    └── requirements/
+        └── wordpress/
+            ├── Dockerfile
+            └── tools/
+                └── init_wordpress.sh
+```
+
+This file belongs to the project directory on the host. The container does not automatically have access to it.
+
+Docker images have their own filesystem. When Docker builds an image, it creates an isolated Linux filesystem containing only the files explicitly included by the Dockerfile. So, if the script is needed inside the container, it must be copied explicitly. That is what ``COPY`` does.
+
+The source path is ``./tools/init_wordpress.sh``. This path is relative to the Docker build context.
+
+The destination path is ``/usr/local/bin/init_wordpress.sh``. This path is inside the image filesystem.
+
+After this instruction, every container created from this image will contain ``/usr/local/bin/init_wordpress.sh``.
+
+## Why Use /usr/local/bin
+
+The destination directory ``/usr/local/bin`` is commonly used on Linux for custom scripts and locally installed executables. It is a good place for scripts that are not installed by the package manager but are added manually by the developer. This directory is usually included in the PATH environment variable. That means the command can be executed by name ``init_wordpress.sh``.
+
+So this Dockerfile can use ``ENTRYPOINT ["init_wordpress.sh"]`` because Docker can find the script through PATH.
+
+## Why This Script Is Needed
+
+Without ``init_wordpress.sh``, the container would contain ``PHP-FPM`` and ``WP-CLI``, but it would not know how to configure WordPress for the Inception project. The script performs runtime tasks such as:
 
 * reading Docker secrets;
 * validating environment variables;
@@ -1127,7 +1184,37 @@ The script performs runtime tasks such as:
 * setting ownership;
 * starting PHP-FPM.
 
-These tasks must happen at runtime, not build time, because they depend on secrets, environment variables, volumes and the MariaDB container.
+The image would contain PHP-FPM, but nobody would generate the correct PHP-FPM pool configuration.
+
+The image would contain the MariaDB client, but nobody would wait for MariaDB to become ready.
+
+So the script is the runtime brain of the WordPress container. It performs the tasks that only make sense when the container is actually starting.
+
+
+## Why These Tasks Cannot Happen in the Dockerfile
+
+A very common mistake is trying to configure everything inside the Dockerfile. The Dockerfile runs at image build time.
+
+During image build time:
+
+* Docker secrets are not mounted;
+* the WordPress volume is not mounted;
+* MariaDB is not running;
+* the Docker network is not active in the same runtime sense;
+* .env values may not be available as container environment variables;
+* the database may not exist yet.
+
+WordPress installation depends on all of those things.
+
+For example, ``wp config create`` needs the database name, database user, database password and database host.
+
+The password comes from Docker secrets.
+
+The host is the MariaDB service name.
+
+The database must already exist or MariaDB must be ready to accept connections.
+
+Those are runtime conditions, not build-time conditions. Therefore, the Dockerfile should only install the tools. The script should perform the configuration.
 
 ---
 
@@ -1136,16 +1223,13 @@ These tasks must happen at runtime, not build time, because they depend on secre
 ```Dockerfile
 RUN chmod +x /usr/local/bin/init_wordpress.sh
 ```
+This instruction gives execution permission to the initialization script.
 
-Gives execution permission to the initialization script.
+Copying a script into the image does not automatically guarantee that Linux can execute it. A file can exist and still not be executable.
 
-Without this, Docker could fail with:
+Linux permissions control what can be done with a file. Without this line, Docker could fail when starting the container with an error like: Permission denied.
 
-```text
-Permission denied
-```
-
-when trying to execute the entrypoint.
+This would happen because the ENTRYPOINT tries to execute the file directly.
 
 ---
 
@@ -1155,27 +1239,38 @@ when trying to execute the entrypoint.
 EXPOSE 9000
 ```
 
-Documents that the WordPress container listens on port 9000.
+This instruction documents that the WordPress container expects to listen on port 9000.
 
-This is the PHP-FPM port.
+This port is used by ``PHP-FPM``.
 
-NGINX uses this port to send PHP requests to WordPress.
+It is not the public website port. The public website is exposed through NGINX on port 443.
 
-The flow is:
+The WordPress container only exposes PHP-FPM internally to the Docker network.
+
+The communication flow is:
+
+> Browser -> NGINX :443 -> wordpress:9000 -> PHP-FPM
+
+The browser never connects directly to port 9000. Only NGINX connects to it.
+
+``EXPOSE`` does not make the port available on the host machine. It only documents that the container listens on that port.
+
+In Docker Compose, this usually corresponds to:
 
 ```text
-NGINX
-  │
-  ▼
-wordpress:9000
-  │
-  ▼
-PHP-FPM
+expose:
+  - "9000"
+
+not:
+
+ports:
+  - "9000:9000"
+
 ```
 
-This port should normally not be published to the host.
+Using ports would publish PHP-FPM to the host machine. That is not needed and is less secure.
 
-Only NGINX needs to reach it through the internal Docker network.
+PHP-FPM is not designed to be accessed directly by a browser. It expects FastCGI requests from NGINX.
 
 ---
 
@@ -1185,114 +1280,104 @@ Only NGINX needs to reach it through the internal Docker network.
 ENTRYPOINT ["init_wordpress.sh"]
 ```
 
-ENTRYPOINT defines the command executed when the container starts.
+``ENTRYPOINT`` defines the command executed every time the container starts. Think of it as the container startup command.
 
-In this case, Docker starts:
+When Docker starts a container from this image, it runs ``init_wordpress.sh``. This script becomes the first process executed inside the container.
 
-```bash
-init_wordpress.sh
-```
+The startup process is:
 
-The script prepares WordPress and then starts PHP-FPM.
+> Container starts -> ENTRYPOINT executes -> init_wordpress.sh runs -> WordPress setup begins
 
-The startup flow is:
+Without an entrypoint, Docker would not know which command should start the service.
+
+A Docker image is only a template.
+
+The container is the running instance.
+
+The ENTRYPOINT tells Docker what the container should do when it starts.
+
+## Why Not Start PHP-FPM Directly?
+
+Because WordPress needs preparation before PHP-FPM starts. Before starting the final PHP-FPM process, the container must:
+
+* read secrets;
+* validate environment variables;
+* generate PHP-FPM configuration;
+* wait for MariaDB;
+* download WordPress if needed;
+* create wp-config.php;
+* install WordPress if needed;
+* create users if needed;
+* fix ownership.
+
+PHP-FPM itself does not know how to do these specific tasks. PHP-FPM only executes PHP code.
+
+So the container needs an initialization script first. That is why the entrypoint is ENTRYPOINT ["init_wordpress.sh"].
+
+and not simply:
+
+ENTRYPOINT ["php-fpm8.2", "-F"]
+
+## Why the Container Becomes Self-Configuring
+
+A self-configuring container is a container that can start and prepare itself automatically.
+
+In this project, that means the WordPress container can start from an empty volume and configure the site without manual browser installation.
+
+The script makes this possible. It checks whether ``/var/www/html/wp-config.php`` exists. If it exists, WordPress is already configured and the script skips installation. If it does not exist, the script installs WordPress.
+
+So the behavior becomes:
 
 ```text
-Container starts
-       │
-       ▼
-init_wordpress.sh
-       │
-       ▼
-Validate secrets and environment
-       │
-       ▼
-Wait for MariaDB
-       │
-       ▼
-Install WordPress if needed
-       │
-       ▼
-Start PHP-FPM
+First start: install WordPress
+
+Next starts: reuse existing installation
 ```
 
-The container becomes self-configuring.
+This is exactly how a containerized service should behave.
 
----
+## Why exec Is Important
 
-# Why exec Is Important
+The final line of the script should be ``exec php-fpm8.2 -F``. This line starts PHP-FPM as the final main process of the container.
 
-The final line of the script should be:
+Without exec, the script would start PHP-FPM as a child process.
 
-```bash
-exec php-fpm8.2 -F
-```
-
-`exec` replaces the shell script with the PHP-FPM process.
-
-Without exec:
+The process tree would look like this:
 
 ```text
 PID 1 -> init_wordpress.sh
 PID 14 -> php-fpm
+
+or:
+
+PID 1 -> init_wordpress.sh
+          └── PID 14 -> php-fpm8.2
 ```
 
-With exec:
+With exec, the shell script is replaced by PHP-FPM. 
+
+The process tree becomes:
 
 ```text
-PID 1 -> php-fpm
+PID 1 -> php-fpm8.2
 ```
 
-Docker monitors PID 1.
+Docker monitors PID 1. If PID 1 exits, the container stops and Docker can restart it according to the restart policy.
 
-If PHP-FPM exits, the container stops and Docker can restart it according to the restart policy.
+Therefore, PHP-FPM should become PID 1 because PHP-FPM is the actual service that must keep running.
 
-The `-F` option runs PHP-FPM in foreground mode.
+## Why -F Is Needed
 
-This is required because Docker containers must keep their main process running in the foreground.
+The option ``-F`` means foreground mode.
 
-If PHP-FPM daemonized into the background, the script would finish and the container would stop.
+Normally, services can daemonize, which means they detach and move into the background. That is normal on traditional Linux systems managed by systemd.
+
+Docker containers work differently. Docker expects the main process to stay in the foreground.
+
+If PHP-FPM moved to the background, the entrypoint script could finish, PID 1 would exit, and Docker would stop the container.
+
+So, ``exec php-fpm8.2 -F`` means replace the script with PHP-FPM and keep PHP-FPM in the foreground.
+
+This keeps the container alive.
 
 ---
-
-# Complete WordPress Startup Sequence
-
-```text
-docker compose up
-        │
-        ▼
-WordPress container starts
-        │
-        ▼
-ENTRYPOINT runs init_wordpress.sh
-        │
-        ▼
-Secrets are loaded
-        │
-        ▼
-Environment variables are validated
-        │
-        ▼
-PHP-FPM configuration is generated
-        │
-        ▼
-Script waits for MariaDB
-        │
-        ▼
-WordPress is downloaded if missing
-        │
-        ▼
-wp-config.php is created
-        │
-        ▼
-WordPress site is installed
-        │
-        ▼
-Users are created
-        │
-        ▼
-PHP-FPM starts in foreground
-        │
-        ▼
-NGINX can forward PHP requests to wordpress:9000
-```
