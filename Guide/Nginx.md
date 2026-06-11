@@ -64,44 +64,151 @@ Its main role is to act as the web server, HTTPS endpoint and gateway to the Wor
 
 # What Is NGINX?
 
-NGINX is a web server. A web server is software that receives HTTP or HTTPS requests and returns responses.
+NGINX is a web server. A web server is a software that receives requests from clients, usually browsers, and returns responses.
 
-When a browser asks for a page, the request must be received by a server. In this project, that server is NGINX.
+In a normal website, the client is usually a browser. The browser sends an HTTP or HTTPS request asking for a resource. That resource can be a page, an image, a CSS file, a JavaScript file, a PHP page or another type of file.
 
-For example, when a browser requests ``https://rmedeiro.42.fr/index.php``, NGINX receives that request and decides what should happen next. Depending on the request, NGINX can:
+For example, when the user writes ``https://rmedeiro.42.fr``, the browser creates a request and sends it to the server responsible for that domain.
 
-* serve a static file directly;
-* forward the request to another service;
-* redirect the request;
-* return an error page;
-* apply TLS/SSL encryption;
-* communicate with PHP-FPM using FastCGI.
+In the Inception project, that server is NGINX.
 
-A static file is a file that does not need code execution. Examples:
+NGINX is the first container that receives traffic from outside Docker. This is why it is called the public entry point of the infrastructure.
 
-* images;
-* CSS files;
-* JavaScript files;
-* fonts;
-* plain HTML files.
+The browser does not connect directly to WordPress and does not connect directly to MariaDB. 
 
-If the browser requests ``/wp-content/uploads/logo.png``, NGINX can read that file from ``/var/www/html`` and return it directly. This is efficient because PHP-FPM does not need to be involved.
+The browser connects to NGINX on port 443. Then NGINX decides what should happen with the request.
 
-However, if the browser requests ``/index.php`` that file contains PHP code. NGINX cannot execute PHP. So NGINX forwards the request to PHP-FPM inside the WordPress container. 
+A simplified architecture is:
 
-This is why NGINX is sometimes described as a ``request router``. It receives the request first and decides where it should go.
+```text
+Browser
+   │
+   │ HTTPS request
+   ▼
+NGINX
+   │
+   ├── Static file? Serve directly
+   │
+   └── PHP file? Forward to WordPress/PHP-FPM
+```
+
+This makes NGINX the front door of the application.
+
+# Why Do We Need NGINX?
+
+NGINX is needed because it performs tasks that WordPress and MariaDB should not perform directly.
+
+WordPress is a PHP application.
+
+MariaDB is a database server.
+
+Neither of them should be directly exposed to the browser.
+
+NGINX is designed to receive web traffic safely and efficiently.
+
+In this project, NGINX is responsible for:
+
+* receiving HTTPS requests;
+* listening on port 443;
+* applying the server configuration;
+* using the SSL/TLS certificate and private key;
+* serving static files directly;
+* forwarding PHP requests to WordPress/PHP-FPM;
+* returning the final response to the browser;
+* acting as the only public container.
+
+If the browser could connect directly to WordPress/PHP-FPM, PHP-FPM would be exposed publicly. That is not the expected design. PHP-FPM expects FastCGI requests from a web server, not direct browser requests.
+
+If the browser could connect directly to MariaDB, the database would be exposed publicly. That would be a serious security problem.
+
+So the correct design is:
+
+```text
+Public:
+    NGINX
+
+Internal:
+    WordPress / PHP-FPM
+    MariaDB
+```
+
+Only NGINX should have a published port to the host machine.
+
+# What Does NGINX Actually Do With a Request?
+
+When NGINX receives a request, it checks its configuration and decides how to handle it. 
+
+For example, if the browser requests ``https://rmedeiro.42.fr/wp-content/uploads/logo.png`` this is a static file. A static file is a file that does not need code execution.
+
+Examples include:
+
+```text
+.png;
+.jpg;
+.css;
+.js;
+.ico;
+.html;
+fonts.
+```
+
+NGINX can serve static files directly from the filesystem.
+
+If the file exists inside ``/var/www/html``, NGINX can read it and return it to the browser.
+
+The flow is:
+
+> Browser asks for logo.png  -> NGINX checks /var/www/html/wp-content/uploads/logo.png  -> File exists  -> NGINX returns the file directly
+
+This is efficient because WordPress and PHP-FPM do not need to be involved.
+
+However, if the browser requests ``https://rmedeiro.42.fr/index.php`` or a WordPress route that eventually needs PHP execution, NGINX cannot execute the PHP code. NGINX is not a PHP interpreter.
+So NGINX forwards the request to PHP-FPM inside the WordPress container.
+
+The flow becomes:
+
+> Browser asks for a dynamic WordPress page  -> NGINX receives the request  -> NGINX forwards it to PHP-FPM  -> PHP-FPM executes WordPress PHP code  -> WordPress queries MariaDB if needed  -> HTML is generated  -> NGINX sends the generated HTML to the browser
+
+This is why NGINX is often described as a ``request router``. It receives the request first and routes it to the correct place.
 
 ---
 
 # NGINX and WordPress
 
-WordPress is written in PHP.
+WordPress is written in PHP. PHP files are not sent directly to the browser as source code. They must be executed on the server.
 
-NGINX is not a PHP interpreter.
+For example, a PHP file may contain:
 
-This means NGINX cannot read a PHP file, execute the PHP logic, query the database and generate HTML by itself. That is the role of ``PHP-FPM`` inside the WordPress container.
+```text
+<?php
+echo get_bloginfo('name');
+?>
+```
 
-So, when NGINX receives a request that must be handled by WordPress, it forwards the request to ``wordpress:9000``. Here, the number 9000 is the PHP-FPM port. The protocol used between NGINX and PHP-FPM is FastCGI. The request flow is:
+The browser does not understand PHP. The browser only understands the final output. Therefore, something on the server must execute the PHP code before the browser receives the response. That component is ``PHP-FPM``.
+
+NGINX receives the browser request, but PHP-FPM executes the PHP code.
+
+The connection between NGINX and WordPress works like this:
+
+```text
+ NGINX
+   │
+   │ FastCGI request
+   |
+   ▼
+ PHP-FPM
+   │
+   │ executes PHP
+   |
+   ▼
+WordPress
+```
+
+In the Docker Compose network, the WordPress service is reachable by its service name (wordpress) and  PHP-FPM listens on port 9000. So NGINX forwards PHP requests to wordpress:9000.
+This is an internal Docker network address. The browser never sees this address. The browser only sees ``https://rmedeiro.42.fr``.
+
+The request flow is:
 
 ```text
      NGINX receives a request
@@ -127,32 +234,25 @@ NGINX sends HTML response to the browser
 
 So NGINX is the public web server that connects the browser to WordPress.
 
----
+# What Is FastCGI?
 
-# What Is TLS/SSL?
+FastCGI is the protocol used by NGINX to communicate with PHP-FPM.
 
-The website must be accessible through HTTPS. HTTPS is HTTP over TLS.
+A protocol is a set of rules that defines how two programs exchange information.
 
-TLS is the modern protocol that encrypts communication between the browser and the server.
+When NGINX forwards a PHP request to PHP-FPM, it sends information such as:
 
-SSL is the older name that is still commonly used in conversation.
+```text
+SCRIPT_FILENAME=/var/www/html/index.php
+REQUEST_METHOD=GET
+QUERY_STRING=
+DOCUMENT_ROOT=/var/www/html
+SERVER_NAME=rmedeiro.42.fr
+```
 
-When a browser connects to ``https://rmedeiro.42.fr`` the connection is encrypted. This means that the data exchanged between the browser and NGINX cannot be read easily by someone intercepting the traffic.
+The most important value is ``SCRIPT_FILENAME``. This tells PHP-FPM which PHP file must be executed. For example, ``SCRIPT_FILENAME=/var/www/html/index.php``.
 
-To support HTTPS, NGINX needs two files:
-
-* SSL certificate
-* Private key
-
-The certificate identifies the server.
-
-The private key is used during the encryption.
-
-In a real production website, the certificate is usually issued by a trusted Certificate Authority.
-
-In Inception, a self-signed certificate is acceptable for the local project environment.
-
-That certificate can be generated with OpenSSL inside the NGINX container.
+PHP-FPM receives that FastCGI request, executes the PHP file, and returns the generated output to NGINX. NGINX then sends the final HTTP response back to the browser. So NGINX does not generate the WordPress page by itself. It delegates PHP execution to PHP-FPM.
 
 ---
 
@@ -236,33 +336,116 @@ The installed packages are:
 * openssl.
 
 
-## nginx
+## The nginx Package
 
 ```bash
 nginx
 ```
 
-This package installs the NGINX web server.
+This package installs the NGINX web server inside the image.
+
+Before this package is installed, the image is only Debian.
+
+After installation, the image contains the NGINX binary, default configuration directories, service files and supporting files.
 
 In this project, NGINX is responsible for receiving the browser request and forwarding it to the correct internal service.
 
-NGINX is responsible for:
+The NGINX package gives the container the ability to:
 
-* listening on port 443;
-* accepting HTTPS connections;
+* open and listening on port 443;
+* accept HTTPS connections;
 * using the SSL certificate and private key;
-* reading the WordPress files from /var/www/html;
-* serving static assets directly;
+* read configuration files (WordPress files) from /var/www/html;;
+* serve files from /var/www/html;
 * forwarding PHP requests to WordPress/PHP-FPM;
 * returning the final response to the browser.
 
-The host browser connects to ``https://rmedeiro.42.fr``
+The most important NGINX configuration concepts are:
 
-This reaches the NGINX container on port 443.
+* server block
+* listen
+* server_name
+* root
+* index
+* location
+* fastcgi_pass
+* ssl_certificate
+* ssl_certificate_key
 
-Then NGINX communicates internally with the WordPress container.
+Each one controls part of the web server behavior.
 
-The browser never talks directly to WordPress or MariaDB.
+
+### listen
+
+The listen tells NGINX which port to accept connections on.
+
+For Inception: ``listen 443 ssl;`` means Listen for HTTPS connections on port 443.
+
+Port 443 is the standard HTTPS port.
+
+### server_name
+
+The server_name tells NGINX which domain this configuration applies to.
+
+Example: ``server_name rmedeiro.42.fr;``. When the browser requests ``https://rmedeiro.42.fr``, NGINX can match that request to this server block.
+
+### root
+
+The root tells NGINX where the website files are stored.
+
+Example: ``root /var/www/html;`` means NGINX will look for files inside ``/var/www/html``. This directory is shared with the WordPress container through a Docker volume. WordPress writes files there.
+NGINX reads files from there.
+
+### index
+
+The index tells NGINX which file to try first when a directory is requested.
+
+Example: ``index index.php index.html;``. If the browser requests ``https://rmedeiro.42.fr/``, NGINX tries to load ``index.php`` or ``index.html`` depending on what exists and how the configuration routes the request.
+
+### location /
+
+A location block defines how NGINX should handle certain request paths.
+
+Example:
+
+```text
+location / {
+	try_files $uri $uri/ /index.php?$args;
+}
+```
+
+This is very important for WordPress.
+
+It means:
+
+* Try to serve the exact requested file.
+* If that does not exist, try the requested directory.
+* If neither exists, send the request to index.php.
+
+This allows WordPress permalinks to work.
+
+### location ~ \.php$
+
+This block handles PHP files. Example:
+
+```text
+location ~ \.php$ {
+	include fastcgi_params;
+	fastcgi_pass wordpress:9000;
+	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+}
+```
+
+This means: If the requested file ends in .php, send it to PHP-FPM.
+
+The directive: ``fastcgi_pass wordpress:9000;`` tells NGINX to forward the request to PHP-FPM inside the WordPress container.
+
+The directive: ``fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;`` tells PHP-FPM the exact PHP file to execute. For example: ``/var/www/html/index.php``.
+
+Without this parameter, PHP-FPM might not know which file to run.
+
+
+
 
 ---
 
@@ -301,7 +484,30 @@ Without OpenSSL, the script could not generate the certificate.
 
 Without a certificate and private key, NGINX could not serve HTTPS on port 443.
 
----
+## What Is TLS/SSL?
+
+The website must be accessible through HTTPS. HTTPS is HTTP over TLS.
+
+TLS is the modern protocol that encrypts communication between the browser and the server.
+
+SSL is the older name that is still commonly used in conversation.
+
+When a browser connects to ``https://rmedeiro.42.fr`` the connection is encrypted. This means that the data exchanged between the browser and NGINX cannot be read easily by someone intercepting the traffic.
+
+To support HTTPS, NGINX needs two files:
+
+* SSL certificate
+* Private key
+
+The certificate identifies the server.
+
+The private key is used during the encryption.
+
+In a real production website, the certificate is usually issued by a trusted Certificate Authority.
+
+In Inception, a self-signed certificate is acceptable for the local project environment.
+
+That certificate can be generated with OpenSSL inside the NGINX container.
 
 # Why Remove apt Cache?
 
