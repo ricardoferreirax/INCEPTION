@@ -22,35 +22,28 @@ ENTRYPOINT ["init_nginx.sh"]
 
 This Dockerfile builds the custom NGINX image used by the NGINX service in the Inception project.
 
-NGINX is the public entry point of the infrastructure. This means that, when a user opens the website in the browser, the request reaches the NGINX container first.
+NGINX is the public entry point of the whole infrastructure. This means that it is the first service contacted when a user opens the website in a browser.
 
-For example: ``https://rmedeiro.42.fr``, the browser does not connect directly to WordPress or MariaDB. The browser connects to NGINX.
+For example, when the user opens ``https://rmedeiro.42.fr``, the browser does not connect directly to WordPress. The browser also does not connect directly to MariaDB. The browser connects to NGINX. This is important because, in the Inception architecture, only one service should be publicly exposed to the host machine: that service is NGINX.
 
-NGINX is responsible for receiving the HTTPS request, handling the TLS/SSL connection, serving static files when possible, and forwarding PHP requests to the WordPress container through PHP-FPM.
+WordPress and MariaDB are internal services. They communicate through the Docker network, but they should not be directly accessible from outside. NGINX is responsible for:
 
-The full request flow is:
+* receiving HTTPS requests from the browser;
+* handling TLS/SSL encryption;
+* using the SSL certificate and private key;
+* serving static files when possible;
+* forwarding PHP requests to WordPress/PHP-FPM;
+* returning the final response to the browser.
 
-```text
-  Browser
-	│
-	│ HTTPS request on port 443
-	▼
-  NGINX
-	│
-	│ FastCGI request
-	▼
-WordPress / PHP-FPM
-	│
-	│ SQL queries
-	▼
-	MariaDB
-```
+The complete request flow is:
 
-Each container has a specific responsibility:
+> Browser ---- HTTPS request on port 443---> NGINX ----- FastCGI request to wordpress:9000 ---> WordPress / PHP-FPM ---- SQL queries to mariadb:3306 ----> MariaDB
+
+Each container has a specific responsibility.
 
 ```text
 NGINX
-    receives public HTTPS traffic
+    receives public HTTPS traffic and routes requests
 
 WordPress
     executes PHP code and generates dynamic pages
@@ -65,7 +58,7 @@ NGINX does not store WordPress posts, users, comments or settings.
 
 NGINX does not manage the database.
 
-Its main role is to act as the web server and reverse gateway to the WordPress service.
+Its main role is to act as the web server, HTTPS endpoint and gateway to the WordPress service.
 
 ---
 
@@ -73,47 +66,93 @@ Its main role is to act as the web server and reverse gateway to the WordPress s
 
 NGINX is a web server. A web server is software that receives HTTP or HTTPS requests and returns responses.
 
-For example, when a browser requests: ``https://rickymercury.42.fr/index.php``, NGINX receives that request and decides what to do with it. It can:
+When a browser asks for a page, the request must be received by a server. In this project, that server is NGINX.
 
-* serve static files directly;
-* handle HTTPS encryption;
-* apply server configuration rules;
-* redirect requests;
-* forward PHP requests to PHP-FPM;
-* return error pages;
-* manage connections efficiently.
+For example, when a browser requests ``https://rmedeiro.42.fr/index.php``, NGINX receives that request and decides what should happen next. Depending on the request, NGINX can:
 
-NGINX is very good at handling many simultaneous connections with low resource usage.
+* serve a static file directly;
+* forward the request to another service;
+* redirect the request;
+* return an error page;
+* apply TLS/SSL encryption;
+* communicate with PHP-FPM using FastCGI.
+
+A static file is a file that does not need code execution. Examples:
+
+* images;
+* CSS files;
+* JavaScript files;
+* fonts;
+* plain HTML files.
+
+If the browser requests ``/wp-content/uploads/logo.png``, NGINX can read that file from ``/var/www/html`` and return it directly. This is efficient because PHP-FPM does not need to be involved.
+
+However, if the browser requests ``/index.php`` that file contains PHP code. NGINX cannot execute PHP. So NGINX forwards the request to PHP-FPM inside the WordPress container. 
+
+This is why NGINX is sometimes described as a ``request router``. It receives the request first and decides where it should go.
 
 ---
 
 # NGINX and WordPress
 
-WordPress is written in PHP. NGINX cannot execute PHP code by itself. If NGINX receives a request for: ``/index.php`` it does not interpret the PHP file directly. Instead, it forwards the request to PHP-FPM inside the WordPress container. The WordPress container listens on: ``wordpress:9000``. The protocol used between NGINX and PHP-FPM is ``FastCGI``. The flow is:
+WordPress is written in PHP.
+
+NGINX is not a PHP interpreter.
+
+This means NGINX cannot read a PHP file, execute the PHP logic, query the database and generate HTML by itself. That is the role of ``PHP-FPM`` inside the WordPress container.
+
+So, when NGINX receives a request that must be handled by WordPress, it forwards the request to ``wordpress:9000``. Here, the number 9000 is the PHP-FPM port. The protocol used between NGINX and PHP-FPM is FastCGI. The request flow is:
 
 ```text
-	 NGINX receives request
-        	  │
-        	  ▼
- 	 Request needs PHP
-        	  │
-        	  ▼
+     NGINX receives a request
+                │
+                ▼
+    Request needs PHP execution
+                │
+                ▼
 NGINX sends FastCGI request to wordpress:9000
-        	  │
-        	  ▼
-PHP-FPM executes WordPress PHP code
-        	  │
-        	  ▼
-WordPress connects to MariaDB if needed
-        	  │
-        	  ▼
- PHP-FPM returns generated HTML
-        	  │
-        	  ▼
-  NGINX sends HTML to browser
+                │
+                ▼
+  PHP-FPM executes WordPress PHP code
+                │
+                ▼
+WordPress connects to MariaDB if database data is needed
+                │
+                ▼
+PHP-FPM returns generated HTML to NGINX
+                │
+                ▼
+NGINX sends HTML response to the browser
 ```
 
-So NGINX is not the application itself. It is the entry point and request router.
+So NGINX is the public web server that connects the browser to WordPress.
+
+---
+
+# What Is TLS/SSL?
+
+The website must be accessible through HTTPS. HTTPS is HTTP over TLS.
+
+TLS is the modern protocol that encrypts communication between the browser and the server.
+
+SSL is the older name that is still commonly used in conversation.
+
+When a browser connects to ``https://rmedeiro.42.fr`` the connection is encrypted. This means that the data exchanged between the browser and NGINX cannot be read easily by someone intercepting the traffic.
+
+To support HTTPS, NGINX needs two files:
+
+* SSL certificate
+* Private key
+
+The certificate identifies the server.
+
+The private key is used during the encryption.
+
+In a real production website, the certificate is usually issued by a trusted Certificate Authority.
+
+In Inception, a self-signed certificate is acceptable for the local project environment.
+
+That certificate can be generated with OpenSSL inside the NGINX container.
 
 ---
 
@@ -125,28 +164,27 @@ FROM debian:bookworm
 
 This instruction defines the base image from which the NGINX image will be built.
 
-Instead of using the official NGINX image: ``FROM nginx`` the project starts from: ``FROM debian:bookworm``. This means the container starts from Debian 12, also known as Bookworm.
-
-Debian provides:
+Instead of using the official NGINX image ``FROM nginx``, the project starts from ``FROM debian:bookworm``. This means the container starts from Debian 12, also known as Bookworm. Debian provides the basic Linux environment required to install and run NGINX. It provides:
 
 * a Linux filesystem hierarchy;
-* the `apt` package manager;
+* the apt package manager;
 * basic shell utilities;
 * system libraries;
-* user and permission system;
+* users and groups;
+* file permissions;
 * networking support;
 * process management tools.
 
-Every instruction after `FROM` is executed on top of this Debian base. The final image becomes:
+Every instruction after ``FROM`` is executed on top of this Debian base. The final image becomes:
 
 ```text
-Debian
+Debian Bookworm
    │
    ├── NGINX package
    ├── OpenSSL package
-   ├── Initialization script
-   ├── Generated NGINX configuration
-   └── SSL certificate files
+   ├── init_nginx.sh
+   ├── generated NGINX configuration
+   └── generated SSL certificate files
 ```
 
 ---
@@ -155,26 +193,28 @@ Debian
 
 The Inception subject requires building services manually instead of relying on ready-made service images.
 
-Using: ``FROM nginx`` would already provide:
+Using ``FROM nginx`` would already provide:
 
 * NGINX installed;
-* default configuration;
-* default entrypoint logic;
+* default configuration files;
+* predefined entrypoint logic;
 * predefined filesystem layout;
 * ready-to-run server behavior.
 
-That would make the project easier, but it would hide important learning. By using Debian and installing NGINX ourselves, we learn:
+That would make the project easier, but it would hide important learning. By using Debian and installing NGINX manually, we learn:
 
 * how NGINX is installed;
-* which package is required;
-* where configuration files are stored;
+* which packages are required;
+* where NGINX configuration files are stored;
 * how HTTPS certificates are generated;
-* how NGINX forwards requests to PHP-FPM;
+* how NGINX listens on port 443;
+* how NGINX forwards PHP requests to PHP-FPM;
+* how Docker networking allows NGINX to reach WordPress;
 * why only NGINX should expose a public port;
 * how the container startup process works;
-* how `ENTRYPOINT` starts the service.
+* how ENTRYPOINT starts the service.
 
-The purpose of Inception is not simply to run NGINX. The purpose is to understand how NGINX fits into a multi-container web infrastructure.
+The goal of Inception is not simply to make NGINX run. The goal is to understand how NGINX fits into a multi-container web infrastructure.
 
 ---
 
@@ -186,51 +226,15 @@ RUN apt-get update && apt-get install -y nginx openssl && rm -rf /var/lib/apt/li
 
 This instruction installs the packages needed by the NGINX container.
 
-Before this line runs, the image is only a basic Debian system.
+Before this line runs, the image is only a basic Debian system. 
 
-After this line runs, the image contains:
+After this line runs, the image contains the software required to receive HTTPS requests and serve the website.
 
-* `nginx`, the web server;
-* `openssl`, the tool used to create SSL/TLS certificates.
+The installed packages are:
 
-This command has three parts:
+* nginx;
+* openssl.
 
-```text
-apt-get update
-        │
-        ▼
-apt-get install nginx openssl
-        │
-        ▼
-remove apt cache
-```
-
----
-
-## apt-get update
-
-```bash
-apt-get update
-```
-
-Debian uses `apt` to install software.
-
-Before installing anything, `apt` needs package indexes.
-
-These indexes tell Debian:
-
-* which packages exist;
-* which versions are available;
-* where packages can be downloaded from;
-* which dependencies each package needs.
-
-`apt-get update` downloads this information.
-
-It does not install software by itself.
-
-Without it, the next command could fail because Debian might not know where to find the `nginx` or `openssl` packages.
-
----
 
 ## nginx
 
@@ -240,31 +244,25 @@ nginx
 
 This package installs the NGINX web server.
 
+In this project, NGINX is responsible for receiving the browser request and forwarding it to the correct internal service.
+
 NGINX is responsible for:
 
 * listening on port 443;
-* receiving HTTPS requests;
+* accepting HTTPS connections;
 * using the SSL certificate and private key;
-* finding the requested file inside `/var/www/html`;
-* serving static files directly;
+* reading the WordPress files from /var/www/html;
+* serving static assets directly;
 * forwarding PHP requests to WordPress/PHP-FPM;
-* returning responses to the browser.
+* returning the final response to the browser.
 
-In the Inception project, NGINX is the only service that should be publicly accessible from the host machine.
+The host browser connects to ``https://rmedeiro.42.fr``
 
-That means the host browser connects to:
+This reaches the NGINX container on port 443.
 
-```text
-https://rickymercury.42.fr
-```
+Then NGINX communicates internally with the WordPress container.
 
-which reaches:
-
-```text
-NGINX container on port 443
-```
-
-NGINX then communicates internally with WordPress.
+The browser never talks directly to WordPress or MariaDB.
 
 ---
 
@@ -276,24 +274,32 @@ openssl
 
 This package installs the OpenSSL command-line tool.
 
-OpenSSL is used to create SSL/TLS certificates.
+OpenSSL is used to generate the SSL/TLS certificate and private key required for HTTPS.
 
-In the Inception project, the website must be served over HTTPS.
+HTTPS requires encryption. For encryption to work, NGINX needs:
 
-HTTPS requires:
+* a certificate file;
+* a private key file.
 
-* a certificate;
-* a private key.
+The initialization script can generate those files with a command similar to:
 
-The initialization script can generate a self-signed certificate using `openssl`.
+```text
+openssl req -x509 -nodes -days 365 \
+	-newkey rsa:2048 \
+	-keyout /etc/nginx/ssl/inception.key \
+	-out /etc/nginx/ssl/inception.crt \
+	-subj "/C=PT/ST=Lisbon/L=Lisbon/O=42/OU=Inception/CN=rmedeiro.42.fr"
+```
 
-A self-signed certificate is not issued by a public Certificate Authority, but it is enough for a local development/evaluation project.
+This creates a self-signed certificate. A self-signed certificate is signed by itself instead of being signed by a public Certificate Authority.
 
-The certificate allows NGINX to accept HTTPS connections on port 443.
+For a real public production website, this would not be ideal because browsers do not automatically trust self-signed certificates.
 
-Without `openssl`, the script would not be able to generate the certificate.
+For Inception, it is acceptable because the goal is to configure HTTPS locally and understand how TLS works.
 
-Without a certificate, NGINX could not serve HTTPS properly.
+Without OpenSSL, the script could not generate the certificate.
+
+Without a certificate and private key, NGINX could not serve HTTPS on port 443.
 
 ---
 
@@ -303,25 +309,19 @@ Without a certificate, NGINX could not serve HTTPS properly.
 rm -rf /var/lib/apt/lists/*
 ```
 
-`apt-get update` downloads package indexes into:
+``apt-get update`` downloads package indexes into ``/var/lib/apt/lists/``. These files are needed only while installing packages.
 
-```text
-/var/lib/apt/lists/
-```
+After nginx and openssl are installed, these package index files are no longer useful inside the final image. Removing them:
 
-These files are useful during installation, but after `nginx` and `openssl` are installed, they are no longer needed.
-
-Removing them:
-
-* reduces image size;
+* reduces the final image size;
 * removes unnecessary metadata;
 * keeps the image cleaner.
 
-This does not remove NGINX.
+This command does not remove NGINX and does not remove OpenSSL.
 
-This does not remove OpenSSL.
+It only removes temporary apt package lists.
 
-It only removes temporary package index files.
+The result is a smaller and cleaner Docker image.
 
 ---
 
@@ -440,19 +440,7 @@ This configuration is what connects NGINX to WordPress.
 
 # How NGINX Serves WordPress
 
-The most important directive is:
-
-```nginx
-root /var/www/html;
-```
-
-This tells NGINX that the website files are inside:
-
-```text
-/var/www/html
-```
-
-This is the same volume mounted in both:
+The most important directive is: ``root /var/www/html``. This tells NGINX that the website files are inside: ``/var/www/html``. This is the same volume mounted in both:
 
 * WordPress container;
 * NGINX container.
