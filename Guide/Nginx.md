@@ -139,108 +139,185 @@ Only NGINX should have a published port to the host machine.
 
 When NGINX receives a request, it checks its configuration and decides how to handle it. 
 
-For example, if the browser requests ``https://rmedeiro.42.fr/wp-content/uploads/logo.png`` this is a static file. A static file is a file that does not need code execution.
+```text
+The browser sends a request.
+			│
+        	▼
+NGINX receives that request.
+			│
+            ▼
+NGINX analyzes the request.
+			│
+            ▼
+NGINX decides how the request should be handled.
+```
 
-Examples include:
+NGINX either:
+
+* serves the requested file itself;
+* forwards the request to PHP-FPM;
+* redirects the request;
+* denies the request;
+* returns an error page.
+
+This decision-making process happens for every single request.
+
+When we type https://rmedeiro.42.fr, the browser sends something similar to:
 
 ```text
-.png;
-.jpg;
-.css;
-.js;
-.ico;
-.html;
-fonts.
+GET / HTTP/1.1
+Host: rmedeiro.42.fr
 ```
+
+This is called an HTTP request.
+
+The request contains information such as:
+
+* Requested resource
+* Domain name
+* Headers
+* Cookies
+* Authentication data
+* Request method
+
+Example:
+
+```text
+GET /index.php means "I want the file index.php".
+
+GET /wp-content/uploads/logo.png means "I want the image logo.png".
+```
+
+NGINX receives these requests and begins analyzing them.
+
+Now, think of NGINX as a receptionist in a large company. People arrive at the reception desk. The receptionist asks: What do you need?
+
+Depending on the answer, the receptionist sends the visitor to the correct department.
+
+NGINX does exactly the same thing. Every request arrives at NGINX first. NGINX examines:
+
+* Requested URL
+* Requested file
+* Request type
+* Server configuration
+
+and then decides: Can I handle this myself? or Do I need to forward this elsewhere?
+
+This is why NGINX is often called a:
+
+* Reverse Proxy
+* Gateway
+* Request Router
+* Traffic Controller
+
+# Understanding Static Content
 
 NGINX can serve static files directly from the filesystem.
 
-If the file exists inside ``/var/www/html``, NGINX can read it and return it to the browser.
+The easiest requests are ``static requests``.
 
-The flow is:
+Static means: ``The file already exists. No code needs to run. No database query is needed``.
 
-> Browser asks for logo.png  -> NGINX checks /var/www/html/wp-content/uploads/logo.png  -> File exists  -> NGINX returns the file directly
+Examples:
 
-This is efficient because WordPress and PHP-FPM do not need to be involved.
+```text
+logo.png
+background.jpg
+style.css
+main.js
+favicon.ico
+```
 
-However, if the browser requests ``https://rmedeiro.42.fr/index.php`` or a WordPress route that eventually needs PHP execution, NGINX cannot execute the PHP code. NGINX is not a PHP interpreter.
-So NGINX forwards the request to PHP-FPM inside the WordPress container.
+These files already exist on disk.
+
+For example, ``/var/www/html/wp-content/uploads/logo.png`` contains actual image data.
+
+NGINX does not need WordPress, PHP or MariaDB. It simply reads the file and sends it back.
+
+Example: Loading an Image
+
+Suppose the browser requests: https://rmedeiro.42.fr/wp-content/uploads/logo.png
+
+The request flow becomes:
+
+> Browser -> NGINX receives request -> Looks inside: /var/www/html/wp-content/uploads/logo.png -> File exists -> Reads file from disk -> Returns image -> Browser displays image
+
+Notice something important:
+
+* PHP-FPM never runs.
+* WordPress never runs.
+* MariaDB never runs.
+
+Only NGINX is involved. This is extremely efficient.
+
+A WordPress page may contain:
+
+```text
+20 images
+5 CSS files
+8 JavaScript files
+3 font files
+```
+
+Imagine if every one of these requests required:
+
+* PHP execution
+* Database queries
+* WordPress loading
+
+The website would become much slower.
+
+Instead: Static assets are Served directly by NGINX.
+
+# Understanding Dynamic Content
+
+Dynamic content is completely different.
+
+Dynamic means: ``The content does not exist as a ready-made file``.
+
+Instead:
+
+* Code must execute.
+* Database may be queried.
+* Content must be generated.
+
+WordPress pages are dynamic.
+
+For example,  suppose someone requests https://rmedeiro.42.fr/index.php. Now NGINX encounters PHP. NGINX cannot execute PHP.
+
+So, if the browser requests a WordPress route that eventually needs PHP execution, NGINX cannot execute the PHP code. NGINX is not a PHP interpreter. So NGINX forwards the request to PHP-FPM inside the WordPress container.
+
+NGINX is a web server. NGINX is NOT a PHP interpreter !
+
+NGINX understands:
+
+* Files
+* Directories
+* HTTP requests
+* HTTPS
+* Networking
+
+But NGINX does not understand PHP instructions. If NGINX tried to execute this file, it would not know what to do.
+
+That is why PHP-FPM exists.
+
+## What Is PHP-FPM's Job?
+
+PHP-FPM means: ``PHP FastCGI Process Manager``. Its entire purpose is:
+
+* Receive PHP requests
+* Execute PHP code
+* Return results
+
+NGINX acts as the receptionist.
+
+PHP-FPM acts as the worker that actually performs the task.
 
 The flow becomes:
 
 > Browser asks for a dynamic WordPress page  -> NGINX receives the request  -> NGINX forwards it to PHP-FPM  -> PHP-FPM executes WordPress PHP code  -> WordPress queries MariaDB if needed  -> HTML is generated  -> NGINX sends the generated HTML to the browser
 
 This is why NGINX is often described as a ``request router``. It receives the request first and routes it to the correct place.
-
----
-
-# How NGINX Serves WordPress
-
-The most important directive is: ``root /var/www/html``. This tells NGINX that the website files are inside: ``/var/www/html``. This is the same volume mounted in both:
-
-* WordPress container;
-* NGINX container.
-
-The WordPress container writes the WordPress files there.
-
-The NGINX container reads those files there.
-
-This shared volume allows NGINX to see:
-
-```text
-index.php
-wp-config.php
-wp-content/
-wp-admin/
-wp-includes/
-```
-
-NGINX then decides how to handle each request.
-
----
-
-## Static Files
-
-Static files do not need PHP execution.
-
-Examples:
-
-* CSS;
-* JavaScript;
-* images;
-* fonts.
-
-If the browser requests:
-
-```text
-/wp-content/uploads/image.png
-```
-
-NGINX can serve that file directly from the volume.
-
-This is efficient because PHP-FPM does not need to be involved.
-
----
-
-## PHP Files
-
-PHP files must be executed.
-
-If the browser requests:
-
-```text
-/index.php
-```
-
-NGINX forwards the request to:
-
-```text
-wordpress:9000
-```
-
-using FastCGI.
-
-That means PHP-FPM inside the WordPress container executes the PHP file and returns generated HTML.
 
 ---
 
