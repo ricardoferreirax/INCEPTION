@@ -94,6 +94,7 @@ NGINX
 
 This makes NGINX the front door of the application.
 
+
 # Why Do We Need NGINX?
 
 NGINX is needed because it performs tasks that WordPress and MariaDB should not perform directly.
@@ -172,6 +173,168 @@ The flow becomes:
 This is why NGINX is often described as a ``request router``. It receives the request first and routes it to the correct place.
 
 ---
+
+# How NGINX Serves WordPress
+
+The most important directive is: ``root /var/www/html``. This tells NGINX that the website files are inside: ``/var/www/html``. This is the same volume mounted in both:
+
+* WordPress container;
+* NGINX container.
+
+The WordPress container writes the WordPress files there.
+
+The NGINX container reads those files there.
+
+This shared volume allows NGINX to see:
+
+```text
+index.php
+wp-config.php
+wp-content/
+wp-admin/
+wp-includes/
+```
+
+NGINX then decides how to handle each request.
+
+---
+
+## Static Files
+
+Static files do not need PHP execution.
+
+Examples:
+
+* CSS;
+* JavaScript;
+* images;
+* fonts.
+
+If the browser requests:
+
+```text
+/wp-content/uploads/image.png
+```
+
+NGINX can serve that file directly from the volume.
+
+This is efficient because PHP-FPM does not need to be involved.
+
+---
+
+## PHP Files
+
+PHP files must be executed.
+
+If the browser requests:
+
+```text
+/index.php
+```
+
+NGINX forwards the request to:
+
+```text
+wordpress:9000
+```
+
+using FastCGI.
+
+That means PHP-FPM inside the WordPress container executes the PHP file and returns generated HTML.
+
+---
+
+# What Is HTTP?
+
+HTTP means ``HyperText Transfer Protocol``.
+
+HTTP is the protocol used by browsers and web servers to exchange web content.
+
+A protocol is a set of rules that defines how two systems communicate.
+
+For example, when a browser requests a page, it sends an HTTP request:
+
+```text
+GET / HTTP/1.1
+Host: rmedeiro.42.fr
+```
+
+The server then responds with an HTTP response:
+
+```text
+HTTP/1.1 200 OK
+Content-Type: text/html
+
+<html>
+	<body>
+		<h1>Hello</h1>
+	</body>
+</html>
+```
+
+HTTP defines the structure of these requests and responses. It defines things such as:
+
+* request methods like GET and POST;
+* headers;
+* status codes;
+* response bodies;
+* cookies;
+* content types.
+
+However, plain HTTP has a major weakness: ``HTTP is not encrypted``. That means the data travels over the network as readable text. If someone intercepts the traffic, they may be able to read:
+
+* requested URLs;
+* form data;
+* cookies;
+* login credentials;
+* page content.
+
+A simplified HTTP flow is:
+
+> Browser --- plain text request ---> Network ---- readable traffic ---> NGINX
+
+This is why HTTP is considered insecure for websites that handle logins, passwords, cookies or private data.
+
+# What Is HTTPS?
+
+HTTPS means: ``HTTP Secure``. Technically, HTTPS is ``HTTP over TLS``.
+
+This means the browser and the server still use HTTP, but the HTTP data is sent inside an encrypted TLS connection.
+
+The HTTP protocol still exists.
+
+The difference is that the HTTP request and response are protected by encryption before travelling through the network.
+
+A simplified HTTPS flow is:
+
+> Browser  ---- encrypted TLS connection ---> Network --- encrypted traffic ---> NGINX
+
+So HTTPS protects the communication between the browser and the server.
+
+With HTTPS, someone intercepting the network traffic cannot easily read the actual content being exchanged.
+
+They may see that a connection exists, but they cannot normally read the protected HTTP data inside it.
+
+# Main Differences Between HTTP and HTTPS
+
+The main differences are:
+
+```text
+HTTP
+    uses no encryption
+    usually uses port 80
+    sends readable data
+    does not prove server identity
+    unsafe for passwords and sessions
+
+HTTPS
+    uses TLS encryption
+    usually uses port 443
+    protects data in transit
+    uses certificates
+    helps prove server identity
+    required for secure login pages
+```
 
 # NGINX and WordPress
 
@@ -374,76 +537,6 @@ The most important NGINX configuration concepts are:
 
 Each one controls part of the web server behavior.
 
-
-### listen
-
-The listen tells NGINX which port to accept connections on.
-
-For Inception: ``listen 443 ssl;`` means Listen for HTTPS connections on port 443.
-
-Port 443 is the standard HTTPS port.
-
-### server_name
-
-The server_name tells NGINX which domain this configuration applies to.
-
-Example: ``server_name rmedeiro.42.fr;``. When the browser requests ``https://rmedeiro.42.fr``, NGINX can match that request to this server block.
-
-### root
-
-The root tells NGINX where the website files are stored.
-
-Example: ``root /var/www/html;`` means NGINX will look for files inside ``/var/www/html``. This directory is shared with the WordPress container through a Docker volume. WordPress writes files there.
-NGINX reads files from there.
-
-### index
-
-The index tells NGINX which file to try first when a directory is requested.
-
-Example: ``index index.php index.html;``. If the browser requests ``https://rmedeiro.42.fr/``, NGINX tries to load ``index.php`` or ``index.html`` depending on what exists and how the configuration routes the request.
-
-### location /
-
-A location block defines how NGINX should handle certain request paths.
-
-Example:
-
-```text
-location / {
-	try_files $uri $uri/ /index.php?$args;
-}
-```
-
-This is very important for WordPress.
-
-It means:
-
-* Try to serve the exact requested file.
-* If that does not exist, try the requested directory.
-* If neither exists, send the request to index.php.
-
-This allows WordPress permalinks to work.
-
-### location ~ \.php$
-
-This block handles PHP files. Example:
-
-```text
-location ~ \.php$ {
-	include fastcgi_params;
-	fastcgi_pass wordpress:9000;
-	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-}
-```
-
-This means: If the requested file ends in .php, send it to PHP-FPM.
-
-The directive: ``fastcgi_pass wordpress:9000;`` tells NGINX to forward the request to PHP-FPM inside the WordPress container.
-
-The directive: ``fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;`` tells PHP-FPM the exact PHP file to execute. For example: ``/var/www/html/index.php``.
-
-Without this parameter, PHP-FPM might not know which file to run.
-
 ---
 
 ## The openssl package
@@ -514,98 +607,6 @@ L   = Locality or city
 O   = Organization
 OU  = Organizational unit
 CN  = Common Name
-```
-
-### What Is HTTP?
-
-HTTP means ``HyperText Transfer Protocol``.
-
-HTTP is the protocol used by browsers and web servers to exchange web content.
-
-A protocol is a set of rules that defines how two systems communicate.
-
-For example, when a browser requests a page, it sends an HTTP request:
-
-```text
-GET / HTTP/1.1
-Host: rmedeiro.42.fr
-```
-
-The server then responds with an HTTP response:
-
-```text
-HTTP/1.1 200 OK
-Content-Type: text/html
-
-<html>
-	<body>
-		<h1>Hello</h1>
-	</body>
-</html>
-```
-
-HTTP defines the structure of these requests and responses. It defines things such as:
-
-* request methods like GET and POST;
-* headers;
-* status codes;
-* response bodies;
-* cookies;
-* content types.
-
-However, plain HTTP has a major weakness: ``HTTP is not encrypted``. That means the data travels over the network as readable text. If someone intercepts the traffic, they may be able to read:
-
-* requested URLs;
-* form data;
-* cookies;
-* login credentials;
-* page content.
-
-A simplified HTTP flow is:
-
-> Browser --- plain text request ---> Network ---- readable traffic ---> NGINX
-
-This is why HTTP is considered insecure for websites that handle logins, passwords, cookies or private data.
-
-### What Is HTTPS?
-
-HTTPS means: ``HTTP Secure``. Technically, HTTPS is ``HTTP over TLS``.
-
-This means the browser and the server still use HTTP, but the HTTP data is sent inside an encrypted TLS connection.
-
-The HTTP protocol still exists.
-
-The difference is that the HTTP request and response are protected by encryption before travelling through the network.
-
-A simplified HTTPS flow is:
-
-> Browser  ---- encrypted TLS connection ---> Network --- encrypted traffic ---> NGINX
-
-So HTTPS protects the communication between the browser and the server.
-
-With HTTPS, someone intercepting the network traffic cannot easily read the actual content being exchanged.
-
-They may see that a connection exists, but they cannot normally read the protected HTTP data inside it.
-
-### Main Differences Between HTTP and HTTPS
-
-The main differences are:
-
-```text
-HTTP
-    uses no encryption
-    usually uses port 80
-    sends readable data
-    does not prove server identity
-    unsafe for passwords and sessions
-
-HTTPS
-    uses TLS encryption
-    usually uses port 443
-    protects data in transit
-    uses certificates
-    helps prove server identity
-    required for secure login pages
 ```
 
 ###  What Is TLS?
@@ -829,31 +830,66 @@ The result is a smaller and cleaner Docker image.
 COPY ./tools/init_nginx.sh /usr/local/bin/init_nginx.sh
 ```
 
-This instruction copies the custom NGINX initialization script into the image.
+This instruction copies the custom NGINX initialization script from the host machine into the Docker image.
 
-At this point, the image contains NGINX and OpenSSL, but it still does not know how to configure NGINX for the Inception project.
-
-That is the role of:
+The Source path ``./tools/init_nginx.sh`` exists on the host machine during image creation. Inside the project:
 
 ```text
-init_nginx.sh
+srcs/
+└── requirements/
+    └── nginx/
+        ├── Dockerfile
+        └── tools/
+            └── init_nginx.sh
 ```
 
-The Dockerfile installs the tools.
+Docker reads this file while building the image.
 
-The script configures and starts the service.
+The file is physically copied into the image.
 
-A useful separation is:
+The Destination Path ``/usr/local/bin/init_nginx.sh`` exists inside the image filesystem. 
+
+The path ``/usr/local/bin`` has a special meaning in Linux. Traditionally, here, is where the custom executables are installed manually.
+The Linux shell automatically searches these directories when a command is executed.
+
+Linux automatically finds the script.
+
+
+After the copy:
 
 ```text
-Dockerfile
-    installs NGINX and OpenSSL
-
-init_nginx.sh
-    generates SSL certificate
-    generates NGINX configuration
-    starts NGINX
+Container
+│
+├── /usr/local/bin/
+│       └── init_nginx.sh
+│
+└── ...
 ```
+
+The script now becomes part of the image itself. Every container created from this image will automatically contain that script.
+
+So, this line transforms a generic Debian container with NGINX installed into a fully configured web server capable of serving the Inception website.
+
+Without this script, the image would contain:
+
+```text
+Debian
+    │
+    ├── NGINX installed
+    ├── OpenSSL installed
+    └── Default NGINX files
+```
+
+but nothing would configure:
+
+* HTTPS;
+* SSL certificates;
+* WordPress integration;
+* FastCGI forwarding;
+* server_name;
+* custom NGINX configuration.
+
+The image would contain software, but it would not know how to use it. This is exactly why the initialization script exists.
 
 ---
 
@@ -888,6 +924,28 @@ It should not be hardcoded blindly inside the Dockerfile.
 
 ---
 
+## Why The Configuration Must Be Generated At Runtime
+
+The NGINX configuration depends on values that only exist when the container starts.
+
+Examples:
+
+```text
+DOMAIN_NAME=rickymercury.42.fr
+PHP_FPM_HOST=wordpress
+PHP_FPM_PORT=9000
+```
+
+These values come from:
+
+* .env
+* docker-compose.yml
+* container environment
+
+The Dockerfile cannot use these values during build time. The initialization script can.
+
+The same image can work with different domains and services.
+
 # Why NGINX Needs a Configuration File
 
 NGINX behavior is controlled by configuration files.
@@ -912,7 +970,7 @@ A simplified configuration looks like:
 ```nginx
 server {
 	listen 443 ssl;
-	server_name rickymercury.42.fr;
+	server_name rmedeiro.42.fr;
 
 	root /var/www/html;
 	index index.php index.html;
@@ -934,77 +992,184 @@ server {
 
 This configuration is what connects NGINX to WordPress.
 
----
+### server
 
-# How NGINX Serves WordPress
-
-The most important directive is: ``root /var/www/html``. This tells NGINX that the website files are inside: ``/var/www/html``. This is the same volume mounted in both:
-
-* WordPress container;
-* NGINX container.
-
-The WordPress container writes the WordPress files there.
-
-The NGINX container reads those files there.
-
-This shared volume allows NGINX to see:
+The block:
 
 ```text
-index.php
-wp-config.php
-wp-content/
-wp-admin/
-wp-includes/
+server {
+
+}
 ```
 
-NGINX then decides how to handle each request.
+Defines a virtual server. It is a website definition. 
 
----
+NGINX can host multiple websites. 
 
-## Static Files
+Each website normally has its own server block.
 
-Static files do not need PHP execution.
+### listen 443 ssl
+
+Tells NGINX to accept connections on port 443 (Use HTTPS).
+
+Without this: No HTTPS support.
+
+### server_name
+
+``server_name rmedeiro.42.fr;`` defines which domain belongs to this server block.
+
+When NGINX receives: ``Host: rmedeiro.42.fr``, it knows this configuration should handle the request.
+
+### root
+
+``root /var/www/html;`` defines the website root directory.
+
+NGINX searches files here.
+
+Example:
+
+Request: ``/logo.png``.
+NGINX searches: ``/var/www/html/logo.png``.
+
+### index
+
+``index index.php index.html;`` defines default files.
+
+Example:
+
+``https://rmedeiro.42.fr/`` becomes: ``index.php`` or ``index.html``.
+
+
+### ssl_certificate
+
+``ssl_certificate /etc/nginx/ssl/inception.crt;`` tells NGINX where the TLS certificate is stored. This certificate is sent to the browser during the TLS handshake.
+
+### ssl_certificate_key
+
+``ssl_certificate_key /etc/nginx/ssl/inception.key;`` tells NGINX where the private key is stored.
+
+Without this key: TLS cannot work.
+
+### location /
+
+Matches normal website requests.
+
+### try_files
+
+``try_files $uri $uri/ /index.php?$args;``
+
+WordPress URLs often look like:
+
+```text
+/about
+/contact
+/blog/my-post
+```
+
+These files do not physically exist. WordPress generates them dynamically.
+
+This directive tells NGINX: ``Try real file``. If not found, send request to index.php, which allows WordPress routing to work.
+
+### location ~ .php$
+
+Matches PHP files.
 
 Examples:
 
-* CSS;
-* JavaScript;
-* images;
-* fonts.
-
-If the browser requests:
-
 ```text
-/wp-content/uploads/image.png
+index.php
+wp-login.php
+wp-admin/index.php
+fastcgi_pass
+fastcgi_pass wordpress:9000;
 ```
 
-NGINX can serve that file directly from the volume.
+This is where NGINX connects to PHP-FPM.
 
-This is efficient because PHP-FPM does not need to be involved.
+### listen
+
+The listen tells NGINX which port to accept connections on.
+
+For Inception: ``listen 443 ssl;`` means Listen for HTTPS connections on port 443.
+
+Port 443 is the standard HTTPS port.
+
+### server_name
+
+The server_name tells NGINX which domain this configuration applies to.
+
+Example: ``server_name rmedeiro.42.fr;``. When the browser requests ``https://rmedeiro.42.fr``, NGINX can match that request to this server block.
+
+### root
+
+The root tells NGINX where the website files are stored.
+
+Example: ``root /var/www/html;`` means NGINX will look for files inside ``/var/www/html``. This directory is shared with the WordPress container through a Docker volume. WordPress writes files there.
+NGINX reads files from there.
+
+### index
+
+The index tells NGINX which file to try first when a directory is requested.
+
+Example: ``index index.php index.html;``. If the browser requests ``https://rmedeiro.42.fr/``, NGINX tries to load ``index.php`` or ``index.html`` depending on what exists and how the configuration routes the request.
+
+### location /
+
+A location block defines how NGINX should handle certain request paths.
+
+Example:
+
+```text
+location / {
+	try_files $uri $uri/ /index.php?$args;
+}
+```
+
+This is very important for WordPress.
+
+It means:
+
+* Try to serve the exact requested file.
+* If that does not exist, try the requested directory.
+* If neither exists, send the request to index.php.
+
+This allows WordPress permalinks to work.
+
+### location ~ \.php$
+
+This block handles PHP files. Example:
+
+```text
+location ~ \.php$ {
+	include fastcgi_params;
+	fastcgi_pass wordpress:9000;
+	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+}
+```
+
+This means: If the requested file ends in .php, send it to PHP-FPM.
+
+The directive: ``fastcgi_pass wordpress:9000;`` tells NGINX to forward the request to PHP-FPM inside the WordPress container.
+
+The directive: ``fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;`` tells PHP-FPM the exact PHP file to execute. For example: ``/var/www/html/index.php``.
+
+Without this parameter, PHP-FPM might not know which file to run.
+
 
 ---
 
-## PHP Files
 
-PHP files must be executed.
 
-If the browser requests:
 
-```text
-/index.php
-```
 
-NGINX forwards the request to:
 
-```text
-wordpress:9000
-```
 
-using FastCGI.
 
-That means PHP-FPM inside the WordPress container executes the PHP file and returns generated HTML.
 
----
+
+
+
+
 
 # Making the Script Executable
 
