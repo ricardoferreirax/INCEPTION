@@ -205,6 +205,34 @@ This is why NGINX is often called a:
 * Request Router
 * Traffic Controller
 
+In the Docker Compose network, the WordPress service is reachable by its service name (wordpress) and  PHP-FPM listens on port 9000. So NGINX forwards PHP requests to wordpress:9000. This is an internal Docker network address. The browser never sees this address. The browser only sees ``https://rmedeiro.42.fr``.
+
+The request flow is:
+
+```text
+     NGINX receives a request
+                │
+                ▼
+    Request needs PHP execution
+                │
+                ▼
+NGINX sends FastCGI request to wordpress:9000
+                │
+                ▼
+  PHP-FPM executes WordPress PHP code
+                │
+                ▼
+WordPress connects to MariaDB if database data is needed
+                │
+                ▼
+PHP-FPM returns generated HTML to NGINX
+                │
+                ▼
+NGINX sends HTML response to the browser
+```
+
+So NGINX is the public web server that connects the browser to WordPress.
+
 ---
 
 # Understanding Static Content
@@ -302,6 +330,10 @@ That is why PHP-FPM exists.
 
 # How NGINX Knows When To Use PHP-FPM
 
+As WordPress is written in PHP, PHP files are not sent directly to the browser as source code, they must be executed on the server.
+
+The browser does not understand PHP. The browser only understands the final output. Therefore, something on the server must execute the PHP code before the browser receives the response. That component is ``PHP-FPM``.
+
 PHP-FPM means: ``PHP FastCGI Process Manager``. Its entire purpose is:
 
 * Receive PHP requests
@@ -339,6 +371,24 @@ NGINX cannot execute PHP code itself. NGINX is a web server, not a PHP interpret
 The flow becomes:
 
 > Browser asks for a dynamic WordPress page  -> NGINX receives the request  -> NGINX forwards it to PHP-FPM  -> PHP-FPM executes WordPress PHP code  -> WordPress queries MariaDB if needed  -> HTML is generated  -> NGINX sends the generated HTML to the browser
+
+NGINX receives the browser request, but PHP-FPM executes the PHP code.
+
+The connection between NGINX and WordPress works like this:
+
+```text
+ NGINX
+   │
+   │ FastCGI request
+   |
+   ▼
+ PHP-FPM
+   │
+   │ executes PHP
+   |
+   ▼
+WordPress
+```
 
 ---
 
@@ -469,66 +519,85 @@ HTTPS
 
 ---
 
-# NGINX and WordPress
+# Understanding the Shared WordPress Volume
 
-WordPress is written in PHP. PHP files are not sent directly to the browser as source code. They must be executed on the server.
+In the Inception project, the WordPress files are stored inside ``/var/www/html``.
 
-For example, a PHP file may contain:
+This path is used by both:
 
-```text
-<?php
-echo get_bloginfo('name');
-?>
-```
+* WordPress container
+* NGINX container
 
-The browser does not understand PHP. The browser only understands the final output. Therefore, something on the server must execute the PHP code before the browser receives the response. That component is ``PHP-FPM``.
+The WordPress container writes files there. For example, during installation, WordPress creates:
 
-NGINX receives the browser request, but PHP-FPM executes the PHP code.
+* index.php
+* wp-config.php
+* wp-admin/
+* wp-content/
+* wp-includes/
 
-The connection between NGINX and WordPress works like this:
+NGINX needs to read those same files. That is why both containers mount the same WordPress volume.
 
-```text
- NGINX
-   │
-   │ FastCGI request
-   |
-   ▼
- PHP-FPM
-   │
-   │ executes PHP
-   |
-   ▼
-WordPress
-```
-
-In the Docker Compose network, the WordPress service is reachable by its service name (wordpress) and  PHP-FPM listens on port 9000. So NGINX forwards PHP requests to wordpress:9000.
-This is an internal Docker network address. The browser never sees this address. The browser only sees ``https://rmedeiro.42.fr``.
-
-The request flow is:
+The idea is:
 
 ```text
-     NGINX receives a request
-                │
-                ▼
-    Request needs PHP execution
-                │
-                ▼
-NGINX sends FastCGI request to wordpress:9000
-                │
-                ▼
-  PHP-FPM executes WordPress PHP code
-                │
-                ▼
-WordPress connects to MariaDB if database data is needed
-                │
-                ▼
-PHP-FPM returns generated HTML to NGINX
-                │
-                ▼
-NGINX sends HTML response to the browser
+WordPress container
+    writes WordPress files into /var/www/html
+
+NGINX container
+    reads WordPress files from /var/www/html
 ```
 
-So NGINX is the public web server that connects the browser to WordPress.
+The shared volume allows both containers to see the same website files.
+
+---
+
+# Why WordPress Needs MariaDB
+
+WordPress needs MariaDB because WordPress is dynamic. The WordPress files contain the application logic, but the actual website data is stored in MariaDB.
+
+For example:
+
+```text
+/var/www/html
+    WordPress PHP files
+
+MariaDB
+    posts, users, comments, settings, passwords, metadata
+```
+
+When WordPress executes, it often needs data from the database. For example, to generate the homepage, WordPress may ask MariaDB for:
+
+* site title
+* active theme
+* latest posts
+* menus
+* users
+* plugin settings
+
+The flow is:
+
+```text
+PHP-FPM executes WordPress
+        │
+        ▼
+WordPress reads wp-config.php
+        │
+        ▼
+WordPress connects to MariaDB
+        │
+        ▼
+MariaDB returns data
+        │
+        ▼
+WordPress generates HTML
+```
+
+So NGINX depends on WordPress/PHP-FPM for PHP execution.
+
+WordPress depends on MariaDB for dynamic data.
+
+MariaDB stores the persistent content.
 
 ---
 
