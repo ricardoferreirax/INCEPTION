@@ -237,13 +237,9 @@ So NGINX is the public web server that connects the browser to WordPress.
 
 # Understanding Static Content
 
-NGINX can serve static files directly from the filesystem.
+It is important to understand that not all website content is generated in the same way. Some content already exists on disk and can be sent immediately to the browser. Other content must be generated dynamically every time a request arrives.
 
-The easiest requests are ``static requests``.
-
-Static means: ``The file already exists. No code needs to run. No database query is needed``.
-
-Examples:
+Static content is content that already exists as a real file on disk. No application logic needs to run, no PHP code needs to execute and no database query is required. The web server simply reads the file and sends it to the browser. Examples:
 
 ```text
 logo.png
@@ -252,77 +248,87 @@ style.css
 main.js
 favicon.ico
 ```
+These files physically exist inside the filesystem. NGINX can serve static files directly from the filesystem. 
 
-These files already exist on disk.
+The easiest requests are ``static requests``. Static means: ``The file already exists. No code needs to run. No database query is needed``.
 
-For example, ``/var/www/html/wp-content/uploads/logo.png`` contains actual image data.
+For example, this file: ``/var/www/html/wp-content/uploads/logo.png``, already contains all the image data. Nothing needs to be calculated or to be generated. The file simply exists. NGINX does not need WordPress, PHP or MariaDB. It simply reads the file and sends it back.
 
-NGINX does not need WordPress, PHP or MariaDB. It simply reads the file and sends it back.
+Suppose the browser requests: https://rmedeiro.42.fr/wp-content/uploads/logo.png. The request flow becomes:
 
-Example: Loading an Image
-
-Suppose the browser requests: https://rmedeiro.42.fr/wp-content/uploads/logo.png
-
-The request flow becomes:
-
-> Browser -> NGINX receives request -> Looks inside: /var/www/html/wp-content/uploads/logo.png -> File exists -> Reads file from disk -> Returns image -> Browser displays image
+> Browser -> NGINX receives request -> NGINX searches: /var/www/html/wp-content/uploads/logo.png -> File found -> NGINX reads the file from disk -> NGINX sends the file to browser -> Browser displays the image
 
 Notice something important:
 
-* PHP-FPM never runs.
-* WordPress never runs.
-* MariaDB never runs.
+* PHP-FPM was not used
+* WordPress was not loaded
+* MariaDB was not queried
 
 Only NGINX is involved. This is extremely efficient.
 
-A WordPress page may contain:
-
-```text
-20 images
-5 CSS files
-8 JavaScript files
-3 font files
-```
-
-Imagine if every one of these requests required:
-
-* PHP execution
-* Database queries
-* WordPress loading
-
-The website would become much slower.
-
-Instead: Static assets are Served directly by NGINX.
+---
 
 # Understanding Dynamic Content
 
-Dynamic content is completely different.
+Dynamic content is the opposite of static content.
 
-Dynamic means: ``The content does not exist as a ready-made file``.
-
-Instead:
+The content does not already exist as a complete file. Instead, it must be generated when the request arrives. So :
 
 * Code must execute.
 * Database may be queried.
 * Content must be generated.
 
-WordPress pages are dynamic.
+Suppose we open https://rmedeiro.42.fr. The homepage may contain:
+
+* Latest posts
+* Latest comments
+* Current user
+* Menus
+* Theme settings
+* Plugin data
+
+This information changes constantly. The homepage cannot simply be stored as: homepage.html, because the content depends on:
+
+* Database contents
+* User session
+* WordPress settings
+* Plugins
+* Theme configuration
+
+So the page must be generated dynamically. That's why WordPress pages are dynamic.
+
+The homepage itself is usually NOT stored as a ready-made HTML file. Instead, WordPress stores PHP code inside files such as:
+
+* index.php
+* wp-blog-header.php
+* theme files
+* plugin files
+
+and stores the actual content inside MariaDB:
+
+* posts
+* pages
+* comments
+* users
+* settings
+
+When someone requests the homepage, WordPress combines: PHP code + Database data to generate HTML. Only then does the page exist.
+
+NGINX can't generate dynamic content, because NGINX is not a PHP interpreter. NGINX understands:
+
+* HTTP or HTTPS
+* Files
+* Directories
+* Networking
+* TLS
+
+If NGINX opened a PHP file, it would simply see text. It would not know how to execute PHP instructions. That is not its job.
 
 For example,  suppose someone requests https://rmedeiro.42.fr/index.php. Now NGINX encounters PHP. NGINX cannot execute PHP.
 
-So, if the browser requests a WordPress route that eventually needs PHP execution, NGINX cannot execute the PHP code. NGINX is not a PHP interpreter. So NGINX forwards the request to PHP-FPM inside the WordPress container.
+So, if the browser requests a WordPress route that eventually needs PHP execution, NGINX cannot execute the PHP code. NGINX is not a PHP interpreter. So NGINX forwards the request to PHP-FPM inside the WordPress container. 
 
 NGINX is a web server. NGINX is NOT a PHP interpreter !
-
-NGINX understands:
-
-* Files
-* Directories
-* HTTP requests
-* HTTPS
-* Networking
-
-But NGINX does not understand PHP instructions. If NGINX tried to execute this file, it would not know what to do.
 
 That is why PHP-FPM exists.
 
@@ -334,19 +340,16 @@ As WordPress is written in PHP, PHP files are not sent directly to the browser a
 
 The browser does not understand PHP. The browser only understands the final output. Therefore, something on the server must execute the PHP code before the browser receives the response. That component is ``PHP-FPM``.
 
-PHP-FPM means: ``PHP FastCGI Process Manager``. Its entire purpose is:
+PHP-FPM means: ``PHP FastCGI Process Manager``. PHP-FPM is the component responsible for executing PHP code. Its entire purpose is:
 
 * Receive PHP requests
 * Execute PHP code
+* Generate output
 * Return results
 
-NGINX acts as the receptionist.
+NGINX acts as the receptionist and PHP-FPM acts as the worker that actually performs the task.
 
-PHP-FPM acts as the worker that actually performs the task.
-
-NGINX knows when to forward a request to PHP-FPM because of its configuration file.
-
-The important part is usually:
+NGINX knows when to forward a request to PHP-FPM because of its configuration file. The important part is usually:
 
 ```text
 location ~ \.php$ {
@@ -433,25 +436,7 @@ HTTP is the protocol used by browsers and web servers to exchange web content.
 
 A protocol is a set of rules that defines how two systems communicate.
 
-For example, when a browser requests a page, it sends an HTTP request:
-
-```text
-GET / HTTP/1.1
-Host: rmedeiro.42.fr
-```
-
-The server then responds with an HTTP response:
-
-```text
-HTTP/1.1 200 OK
-Content-Type: text/html
-
-<html>
-	<body>
-		<h1>Hello</h1>
-	</body>
-</html>
-```
+HTTP is the communication language used by browsers and web servers. When a browser requests a page, it sends an HTTP request. When a server responds, it sends an HTTP response.
 
 HTTP defines the structure of these requests and responses. It defines things such as:
 
@@ -461,6 +446,8 @@ HTTP defines the structure of these requests and responses. It defines things su
 * response bodies;
 * cookies;
 * content types.
+
+Without HTTP, the communication between Browser ↔ Server would not exist.
 
 However, plain HTTP has a major weakness: ``HTTP is not encrypted``. That means the data travels over the network as readable text. If someone intercepts the traffic, they may be able to read:
 
@@ -478,13 +465,11 @@ This is why HTTP is considered insecure for websites that handle logins, passwor
 
 # What Is HTTPS?
 
-HTTPS means: ``HTTP Secure``. Technically, HTTPS is ``HTTP over TLS``.
+HTTPS means: ``HTTP Secure``. Technically, HTTPS is ``HTTP over TLS``. 
 
-This means the browser and the server still use HTTP, but the HTTP data is sent inside an encrypted TLS connection.
+HTTPS is still HTTP. The HTTP protocol still exists. This means the browser and the server still use HTTP, but the HTTP data is sent inside an encrypted TLS connection. The communication channel becomes encrypted.
 
-The HTTP protocol still exists.
-
-The difference is that the HTTP request and response are protected by encryption before travelling through the network.
+The HTTP request and response are protected by encryption before travelling through the network.
 
 A simplified HTTPS flow is:
 
