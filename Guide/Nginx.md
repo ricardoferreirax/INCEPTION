@@ -586,6 +586,38 @@ MariaDB stores the persistent content.
 
 ---
 
+## Why NGINX Depends on WordPress
+
+NGINX can start without WordPress, but the website will not fully work unless WordPress/PHP-FPM is reachable.
+
+NGINX depends on WordPress for dynamic PHP pages. 
+
+For static files, NGINX can respond alone.
+
+For PHP pages, NGINX must forward the request to: ``wordpress:9000``.
+
+If WordPress is down, PHP requests will fail. The user may see: ``502 Bad Gateway``. This usually means NGINX is running, but the upstream service, PHP-FPM, is not reachable.
+
+So the dependency is:
+
+* NGINX needs WordPress/PHP-FPM for PHP execution.
+* WordPress needs MariaDB for dynamic data.
+* MariaDB stores the persistent data.
+
+Full dependency chain:
+
+> Browser ---> NGINX  ---- depends on ---> WordPress / PHP-FPM ---- depends on ---> MariaDB
+
+NGINX needs OpenSSL-generated certificate files to serve securely over HTTPS. The flow becomes:
+
+> Browser  ----- HTTPS / TLS ---> NGINX ----- FastCGI ----> WordPress / PHP-FPM ---- SQL ---> MariaDB
+
+OpenSSL does not serve the website. NGINX serves the website.
+
+OpenSSL only helps create the cryptographic files that allow NGINX to serve HTTPS.
+
+---
+
 # FROM debian:bookworm
 
 ```Dockerfile
@@ -702,9 +734,225 @@ OpenSSL is a tool used to work with cryptography. In this project, it is mainly 
 * a certificate file;
 * a private key file.
 
-NGINX needs these files because the Inception subject requires the website to be served over HTTPS, not plain HTTP.
+NGINX needs these files because the Inception subject requires the website to be served over HTTPS, not plain HTTP. So, without OpenSSL, the script would not be able to generate the certificate and private key required by NGINX. Without the certificate and private key, NGINX could still serve HTTP, but it could not correctly serve HTTPS on port 443.
 
-So, without OpenSSL, the script would not be able to generate the certificate and private key required by NGINX. Without the certificate and private key, NGINX could still serve HTTP, but it could not correctly serve HTTPS on port 443.
+---
+
+##  What Is TLS?
+
+TLS means ``Transport Layer Security``.
+
+TLS is the modern security protocol used by HTTPS to protect communication between a client and a server.
+
+In this project, the client is usually the browser, and the server is NGINX.
+
+TLS exists because normal network communication is not automatically private. When data travels from a browser to a server, it may pass through many points:
+
+> Browser ->  Local network -> Router -> ISP -> Internet -> Server
+
+Without encryption, data can potentially be inspected or modified by someone with access to part of the network path.
+
+When the browser opens https://rmedeiro.42.fr, the browser does not immediately send the HTTP request in plain text. First, the browser and NGINX establish a secure TLS connection. Only after that secure connection exists does the browser send the HTTP request through it. This is why HTTPS is often described as ``HTTP over TLS``. That means HTTP is still used and TLS protects the HTTP communication.
+
+Without TLS, the browser would communicate with the server using plain HTTP, where the data can be read if intercepted.
+
+With TLS, the data is encrypted before travelling through the network.
+
+TLS provides three important security properties:
+
+* ``Encryption`` means transforming readable data into unreadable data before sending it through the network. Someone looking at the encrypted traffic cannot easily understand the original content. Only the browser and NGINX can understand the communication because they establish shared encryption keys during the TLS handshake. For a WordPress website, encryption is important because requests may contain login credentials, administrator actions, form submissions and personal data. Without TLS, that data could travel as readable text. With TLS, it is protected while travelling between the browser and NGINX.
+
+* ``Authentication`` means the browser can verify the identity of the server. In this context, the browser wants to know something like: ``Am I really talking to rmedeiro.42.fr?`` This is where the certificate is used. When the browser connects to https://rmedeiro.42.fr, NGINX presents a certificate. That certificate says, conceptually: ``This server is rmedeiro.42.fr. Here is my public key. Here is information about who issued this certificate``. In a real production website, the certificate is signed by a trusted Certificate Authority. A Certificate Authority is an organization trusted by browsers and operating systems to verify domain ownership. The browser checks whether the certificate was signed by a trusted authority. If yes, the browser trusts the server identity. If not, the browser may show a warning. In Inception, the certificate is usually self-signed. That means the server generated and signed the certificate itself. The connection can still be encrypted, but the browser cannot verify the identity through a trusted external authority. That is why a browser may show a warning for local Inception website.
+
+* ``Integrity`` means ensuring that the data was not modified silently while travelling through the network. If someone modifies encrypted TLS traffic, the browser and server can detect that the data has been altered. The connection will fail instead of accepting corrupted or modified data. This is important because encryption alone is not enough. TLS must also ensure that the encrypted data was not manipulated.
+
+---
+
+## What Is a Self-Signed Certificate?
+
+A self-signed certificate is a certificate signed by its own private key instead of being signed by a trusted Certificate Authority.
+
+In production, the trust chain is usually:
+
+```text
+Trusted Certificate Authority
+        │
+        ▼
+Signs certificate
+        │
+        ▼
+Browser trusts the CA
+        │
+        ▼
+Browser trusts the certificate
+```
+
+For example, if Let's Encrypt signs a certificate for a domain, the browser trusts it because the browser already trusts Let's Encrypt.
+
+With a self-signed certificate, the chain is different:
+
+```text
+Server creates certificate
+        │
+        ▼
+Server signs its own certificate
+        │
+        ▼
+Browser does not know whether to trust it
+```
+
+So the server is essentially saying: ``Trust me, I am who I say I am``. The encryption can still work. The TLS tunnel can still be established. But the browser cannot verify the server identity through a trusted third party. That is why browsers usually show a warning. The warning means: The certificate is not trusted by a known Certificate Authority. It does not necessarily mean: There is no encryption.
+
+For Inception, a self-signed certificate is acceptable because:
+
+* the project runs locally
+* the domain is mapped manually in /etc/hosts
+* the goal is to configure HTTPS manually
+* a public trusted certificate is not required
+
+---
+
+## What Is SSL?
+
+SSL means ``Secure Sockets Layer``.
+
+SSL was the older security protocol used before TLS. Today, SSL is obsolete and should not be used. TLS replaced SSL. However, people still commonly say "SSL certificate" even though modern HTTPS uses TLS.
+
+So, in practice, ``SSL certificate`` usually means ``TLS certificate``.
+
+The name "SSL" remains common, but the modern protocol is TLS.
+
+In an NGINX configuration, directives still use names like:
+
+```text
+ssl_certificate
+ssl_certificate_key
+ssl_protocols TLSv1.2 TLSv1.3;
+```
+
+Even though the directive says ssl_, the actual secure protocols used should be TLS versions.
+
+---
+
+## What Happens During an HTTPS Connection?
+
+When the browser connects to NGINX using HTTPS, a TLS handshake happens before normal HTTP data is exchanged.
+
+A handshake is a negotiation phase. During this phase, the browser and NGINX agree on how to communicate securely.
+
+A simplified flow is:
+
+```text
+Browser connects to https://rmedeiro.42.fr
+                 │
+                 ▼
+    NGINX presents its certificate
+                 │
+                 ▼
+    Browser checks the certificate
+                 │
+                 ▼
+Browser and NGINX agree on encryption keys
+                 │
+                 ▼
+   Encrypted connection is established
+                 │
+                 ▼
+HTTP request is sent inside the encrypted TLS tunnel
+```
+
+After the TLS connection is established, the browser can safely send normal HTTP requests through the encrypted channel. This is why HTTPS is often described as ``HTTP over TLS``.
+
+---
+
+## What Is a Certificate?
+
+A certificate is a public file that identifies the server and contains its public key.
+
+In this project, the certificate file is usually ``/etc/nginx/ssl/inception.crt``. 
+
+The NGINX configuration points to it with ``ssl_certificate /etc/nginx/ssl/inception.crt;``.
+
+A certificate usually contains:
+
+* domain name - tells the browser which domain the certificate belongs to.
+* public key - is used during the TLS process.
+* issuer information and signature - tell the browser who signed the certificate.
+* validity period
+* organization or location
+
+The certificate is public. It is sent to the browser during the TLS handshake. It does not need to be secret. Its purpose is to allow the browser to know which server it is talking to and to obtain the public key used in the TLS process.
+
+A certificate is similar to an identity card. It says: ``This server claims to be rmedeiro.42.fr. Here is the public key associated with this identity``.
+
+---
+
+## What Is a Private Key?
+
+The private key is the secret key that belongs to the server.
+
+In this project, the private key file is usually ``/etc/nginx/ssl/inception.key``.
+
+The NGINX configuration points to it with ``ssl_certificate_key /etc/nginx/ssl/inception.key;``.
+
+The private key is linked to the public key inside the certificate. 
+
+The public key can be shared. The private key must remain secret.
+
+The private key is used by NGINX during the TLS handshake to prove that it owns the certificate.
+
+A simple analogy:
+
+```text
+Certificate:
+    public identity card
+
+Private key:
+    secret proof that the identity card belongs to you
+```
+
+If someone steals the private key, they may be able to impersonate the server. That is why the private key must not be:
+
+* shared publicly
+* copied into public documentation
+* exposed to users
+
+In Inception, the private key is generated locally for the container, but the concept is the same.
+
+---
+
+## Certificate and Private Key Together
+
+NGINX needs both files to serve HTTPS.
+
+The certificate alone is not enough because it only contains public information.
+
+The private key alone is not enough because the browser also needs the certificate identity information.
+
+Together they allow NGINX to prove its identity and establish encrypted communication.
+
+```text
+Certificate
+    tells the browser who the server claims to be
+    contains the public key
+
+Private key
+    proves the server owns the matching key pair
+    must remain secret
+
+TLS
+    uses both during the handshake
+```
+
+If one file is missing, HTTPS cannot work correctly.
+
+If the certificate and private key do not match, NGINX may fail to start or the TLS handshake may fail.
+
+The certificate answers: Who am I? and the private key answers: Can I prove it?
+
+Think about entering an airport. We show the passport to identify ourselves but anyone could steal a passport. So the airport also needs proof that the passport really belongs to us. The private key is that proof.
+
+The certificate can be seen by everyone. The private key must never be shared.
 
 The initialization script can generate the certificate and private key using OpenSSL:
 
@@ -727,16 +975,6 @@ After execution, two files are both created:
 
 * /etc/nginx/ssl/inception.key
 * /etc/nginx/ssl/inception.crt
-
-### Why Are Two Files Needed?
-
-Because they solve two completely different problems.
-
-The certificate answers: Who am I? and the private key answers: Can I prove it?
-
-Think about entering an airport. We show the passport to identify ourselves but anyone could steal a passport. So the airport also needs proof that the passport really belongs to us. The private key is that proof.
-
-The certificate can be seen by everyone. The private key must never be shared.
 
 The ``req`` command is used to create certificate requests and certificates. In this case, it is used to generate a self-signed certificate directly.
 
@@ -762,197 +1000,6 @@ The ``-subj "/C=PT/ST=Lisbon/L=Lisbon/O=42/OU=Inception/CN=rmedeiro.42.fr"`` fil
 * Common Name?
 
 The -subj option answers them automatically.
-
-###  What Is TLS?
-
-TLS means ``Transport Layer Security``.
-
-TLS is the modern encryption protocol used by HTTPS. It provides three important security properties:
-
-* Encryption
-* Authentication
-* Integrity
-
-``Encryption`` means that the data is transformed into unreadable information while it travels through the network.
-
-Without encryption, for example, ``password=abc123`` could travel as readable text. With encryption, it becomes something unreadable, conceptually like: ``8fA92ksLq0Zx...==``. Only the browser and the server can understand the encrypted communication.
-
-``Authentication`` means the browser can verify the identity of the server. When the browser connects to ``https://rmedeiro.42.fr`` the server presents a certificate. The certificate says: ``I am the server for rmedeiro.42.fr``. In production, the browser trusts this certificate only if it was signed by a trusted Certificate Authority. In Inception, the certificate is self-signed, so the browser may show a warning.
-
-``Integrity`` means the data cannot be modified silently while travelling through the network. If someone tries to alter the encrypted traffic, the TLS verification will fail. This protects against tampering.
-
-### What Is SSL?
-
-SSL means ``Secure Sockets Layer``.
-
-SSL was the older protocol used before TLS. Today, SSL is obsolete and should not be used. TLS replaced SSL. However, people still commonly say "SSL certificate" even though modern HTTPS uses TLS.
-
-So, in practice, ``SSL certificate`` usually means ``TLS certificate``.
-
-The name "SSL" remains common, but the modern protocol is TLS.
-
-In an NGINX configuration, directives still use names like:
-
-```text
-ssl_certificate
-ssl_certificate_key
-ssl_protocols TLSv1.2 TLSv1.3;
-```
-
-Even though the directive says ssl_, the actual secure protocols used should be TLS versions.
-
-### What Happens During an HTTPS Connection?
-
-When a browser connects to NGINX using HTTPS, a TLS happens before normal HTTP data is exchanged.
-
-A simplified flow is:
-
-Browser connects to https://rmedeiro.42.fr
-                 │
-                 ▼
-    NGINX presents its certificate
-                 │
-                 ▼
-    Browser checks the certificate
-                 │
-                 ▼
-Browser and NGINX agree on encryption keys
-                 │
-                 ▼
-   Encrypted connection is established
-                 │
-                 ▼
-HTTP request is sent inside the encrypted TLS tunnel
-
-After the TLS connection is established, the browser can safely send normal HTTP requests through the encrypted channel. This is why HTTPS is often described as ``HTTP over TLS``.
-
-
-### What Is a Certificate?
-
-A certificate is a file that contains information about the server identity and its public key.
-
-In this project, the certificate file is usually ``/etc/nginx/ssl/inception.crt``. The NGINX configuration points to it with ``ssl_certificate /etc/nginx/ssl/inception.crt;``.
-
-A certificate usually contains:
-
-* domain name;
-* public key;
-* validity period;
-* issuer information;
-* signature;
-* organization or location metadata.
-
-The certificate is public. It is sent to the browser during the TLS handshake.
-
-The certificate does not need to be secret. Its purpose is to allow the browser to know which server it is talking to and to obtain the public key used in the TLS process.
-
-### What Is a Private Key?
-
-The private key is the secret key that belongs to the server.
-
-In this project, the private key file is usually ``/etc/nginx/ssl/inception.key``. The NGINX configuration points to it with ``ssl_certificate_key /etc/nginx/ssl/inception.key;``.
-
-The private key must remain private. It should never be shared publicly. It should never be committed to a public repository. It should never be exposed to users.
-
-The private key is linked to the public key inside the certificate.
-
-During the TLS handshake, NGINX uses the private key to prove that it is the legitimate owner of the certificate.
-
-The certificate can be public. The private key must be secret.
-
-A simple analogy:
-
-```text
-Certificate
-    public identity card
-
-Private key
-    secret proof that you own that identity
-```
-
-### Certificate and Private Key Together
-
-NGINX needs both files.
-
-The certificate and private key alone is not enough.
-
-Together they allow NGINX to serve HTTPS.
-
-```text
-Certificate
-    tells the browser who the server claims to be
-
-Private key
-    proves the server owns that certificate
-
-TLS
-    uses them to establish encrypted communication
-```
-
-In NGINX:
-
-```text
-ssl_certificate /etc/nginx/ssl/inception.crt;
-ssl_certificate_key /etc/nginx/ssl/inception.key;
-```
-
-If one of these files is missing or mismatched, NGINX may fail to start or HTTPS may not work.
-
-
-### What Is a Self-Signed Certificate?
-
-A self-signed certificate is a certificate that is signed by its own private key instead of being signed by a trusted Certificate Authority.
-
-In simple terms:
-
-```text
-Trusted CA certificate:
-    A trusted authority says: this server is legitimate.
-
-Self-signed certificate:
-    The server says: trust me, I am legitimate.
-```
-
-The encryption can still work with a self-signed certificate. The browser can still establish an encrypted connection. However, the browser does not automatically trust the identity because no trusted external authority verified it. That is why browsers usually show a warning for self-signed certificates. This warning does not necessarily mean the connection cannot be encrypted. It means the browser cannot verify the identity through a trusted CA.
-
-For Inception, this is acceptable because:
-
-* the project runs locally;
-* the domain is mapped manually in /etc/hosts;
-* the goal is to configure TLS/HTTPS manually;
-* a public CA certificate is not required.
-
-Without a certificate and private key, NGINX could not serve HTTPS on port 443.
-
-### Why NGINX Depends on WordPress
-
-NGINX can start without WordPress, but the website will not fully work unless WordPress/PHP-FPM is reachable.
-
-NGINX depends on WordPress for dynamic PHP pages. 
-
-For static files, NGINX can respond alone.
-
-For PHP pages, NGINX must forward the request to: ``wordpress:9000``.
-
-If WordPress is down, PHP requests will fail. The user may see: ``502 Bad Gateway``. This usually means NGINX is running, but the upstream service, PHP-FPM, is not reachable.
-
-So the dependency is:
-
-* NGINX needs WordPress/PHP-FPM for PHP execution.
-* WordPress needs MariaDB for dynamic data.
-* MariaDB stores the persistent data.
-
-Full dependency chain:
-
-> Browser ---> NGINX  ---- depends on ---> WordPress / PHP-FPM ---- depends on ---> MariaDB
-
-NGINX needs OpenSSL-generated certificate files to serve securely over HTTPS. The flow becomes:
-
-> Browser  ----- HTTPS / TLS ---> NGINX ----- FastCGI ----> WordPress / PHP-FPM ---- SQL ---> MariaDB
-
-OpenSSL does not serve the website. NGINX serves the website.
-
-OpenSSL only helps create the cryptographic files that allow NGINX to serve HTTPS.
 
 ---
 
