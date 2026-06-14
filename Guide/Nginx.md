@@ -665,7 +665,6 @@ The installed packages are:
 * nginx;
 * openssl.
 
-
 ## The nginx Package
 
 ```bash
@@ -678,9 +677,7 @@ Before this package is installed, the image is only Debian.
 
 After installation, the image contains the NGINX binary, default configuration directories, service files and supporting files.
 
-In this project, NGINX is responsible for receiving the browser request and forwarding it to the correct internal service.
-
-The NGINX package gives the container the ability to:
+In this project, NGINX is responsible for receiving the browser request and forwarding it to the correct internal service. The NGINX package gives the container the ability to:
 
 * open and listening on port 443;
 * accept HTTPS connections;
@@ -689,20 +686,6 @@ The NGINX package gives the container the ability to:
 * serve files from /var/www/html;
 * forwarding PHP requests to WordPress/PHP-FPM;
 * returning the final response to the browser.
-
-The most important NGINX configuration concepts are:
-
-* server block
-* listen
-* server_name
-* root
-* index
-* location
-* fastcgi_pass
-* ssl_certificate
-* ssl_certificate_key
-
-Each one controls part of the web server behavior.
 
 ---
 
@@ -721,19 +704,9 @@ OpenSSL is a tool used to work with cryptography. In this project, it is mainly 
 
 NGINX needs these files because the Inception subject requires the website to be served over HTTPS, not plain HTTP.
 
-In simple terms:
+So, without OpenSSL, the script would not be able to generate the certificate and private key required by NGINX. Without the certificate and private key, NGINX could still serve HTTP, but it could not correctly serve HTTPS on port 443.
 
-```text
-``HTTP`` - sends data without encryption.
-
-``HTTPS`` - sends data through an encrypted TLS connection
-```
-
-So, without OpenSSL, the script would not be able to generate the certificate and private key required by NGINX.
-
-Without the certificate and private key, NGINX could still serve HTTP, but it could not correctly serve HTTPS on port 443.
-
-The initialization script can generate the certificate and private key using something like:
+The initialization script can generate the certificate and private key using OpenSSL:
 
 ```text
 openssl req -x509 -nodes -days 365 \
@@ -743,38 +716,52 @@ openssl req -x509 -nodes -days 365 \
 	-subj "/C=PT/ST=Lisbon/L=Lisbon/O=42/OU=Inception/CN=rmedeiro.42.fr"
 ```
 
-This command creates both:
+This command is actually performing one very specific task:
+
+* Generate a private key
+* Generate a certificate
+* Link them together
+* Store them on disk
+
+After execution, two files are both created:
 
 * /etc/nginx/ssl/inception.key
 * /etc/nginx/ssl/inception.crt
 
+### Why Are Two Files Needed?
+
+Because they solve two completely different problems.
+
+The certificate answers: Who am I? and the private key answers: Can I prove it?
+
+Think about entering an airport. We show the passport to identify ourselves but anyone could steal a passport. So the airport also needs proof that the passport really belongs to us. The private key is that proof.
+
+The certificate can be seen by everyone. The private key must never be shared.
+
 The ``req`` command is used to create certificate requests and certificates. In this case, it is used to generate a self-signed certificate directly.
 
-The ``-x509`` tells OpenSSL to output a self-signed X.509 certificate. X.509 is the standard format used for TLS certificates.
+The ``-x509`` tells OpenSSL to generate a self-signed X.509 certificate. X.509 is the standard format used for TLS certificates.
 
 The ``-nodes`` means the private key should not be encrypted with a passphrase. This is useful in Docker because NGINX must be able to start automatically. If the private key required a passphrase, NGINX would ask for it at startup. That would block container automation.
 So ``-nodes`` allows NGINX to read the private key without human input.
 
 The ``-days 365`` sets the certificate validity period to 365 days. After that period, the certificate expires.
 
-The ``-newkey rsa:2048`` creates a new RSA private key with a size of 2048 bits. The key size controls the strength of the key. 2048 bits is commonly used for local development and basic TLS setups.
+The ``-newkey rsa:2048`` creates a new RSA private key with a size of 2048 bits. For Inception, it is mainly used for server authentication and TLS certificate generation. The key size gives more security.
 
-The ``-keyout /etc/nginx/ssl/inception.key`` tells OpenSSL where to write the private key.
+The ``-keyout /etc/nginx/ssl/inception.key`` tells OpenSSL where to write the private key. Writes the private key to /etc/nginx/ssl/inception.key.This file contains secret cryptographic information. NGINX uses this file internally during TLS handshakes.
 
-The ``-out /etc/nginx/ssl/inception.crt`` tells OpenSSL where to write the certificate.
+The ``-out /etc/nginx/ssl/inception.crt`` tells OpenSSL where to write the certificate. Writes the certificate key to /etc/nginx/ssl/inception.crt.
+Unlike the private key, the certificate is public. Every browser that connects to NGINX receives a copy of the certificate. It does NOT contain the private key. Only the public key.
 
-The ``-subj "/C=PT/ST=Lisbon/L=Lisbon/O=42/OU=Inception/CN=rmedeiro.42.fr"`` provides certificate subject information without interactive prompts.
+The ``-subj "/C=PT/ST=Lisbon/L=Lisbon/O=42/OU=Inception/CN=rmedeiro.42.fr"`` fills the certificate indentity information without interactive prompts. Normally OpenSSL would ask questions interactively:
 
-The fields mean:
+* Country?
+* State?
+* Organization?
+* Common Name?
 
-```text
-C   = Country
-ST  = State or region
-L   = Locality or city
-O   = Organization
-OU  = Organizational unit
-CN  = Common Name
-```
+The -subj option answers them automatically.
 
 ###  What Is TLS?
 
