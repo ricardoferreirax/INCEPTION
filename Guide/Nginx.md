@@ -94,20 +94,25 @@ NGINX
 
 This makes NGINX the front door of the application.
 
+---
 
 # Why Do We Need NGINX?
 
-NGINX is needed because it performs tasks that WordPress and MariaDB should not perform directly.
+NGINX is needed because it is the public entry point of the Inception infrastructure. 
 
-WordPress is a PHP application.
+NGINX performs tasks that WordPress and MariaDB should not perform directly.
 
-MariaDB is a database server.
+In this project, the browser must not communicate directly with WordPress or MariaDB.
 
-Neither of them should be directly exposed to the browser.
+WordPress is a PHP application. Its job is to execute application logic and generate dynamic pages.
 
-NGINX is designed to receive web traffic safely and efficiently.
+MariaDB is a database server. Its job is to store persistent data such as users, posts, comments, passwords, settings and metadata.
 
-In this project, NGINX is responsible for:
+Neither WordPress/PHP-FPM nor MariaDB should be directly exposed to the host machine or browser.
+
+NGINX is designed to receive web traffic safely and efficiently. NGINX receives the HTTPS request from the browser, handles the TLS/SSL connection, checks its configuration, and decides how the request should be processed. If the request is for a static file, NGINX can serve it directly. If the request needs PHP execution, NGINX forwards it to PHP-FPM inside the WordPress container.
+
+So NGINX is responsible for:
 
 * receiving HTTPS requests;
 * listening on port 443;
@@ -118,26 +123,57 @@ In this project, NGINX is responsible for:
 * returning the final response to the browser;
 * acting as the only public container.
 
+Only NGINX should have a published port to the host machine.
+
 If the browser could connect directly to WordPress/PHP-FPM, PHP-FPM would be exposed publicly. That is not the expected design. PHP-FPM expects FastCGI requests from a web server, not direct browser requests.
 
 If the browser could connect directly to MariaDB, the database would be exposed publicly. That would be a serious security problem.
 
-So the correct design is:
+In Docker Compose, this means NGINX uses:
 
 ```text
-Public:
-    NGINX
-
-Internal:
-    WordPress / PHP-FPM
-    MariaDB
+ports:
+  - "443:443"
 ```
 
-Only NGINX should have a published port to the host machine.
+while WordPress and MariaDB should only use internal networking.
+
+---
 
 # What Does NGINX Actually Do With a Request?
 
-When NGINX receives a request, it checks its configuration and decides how to handle it. 
+When a browser opens https://rmedeiro.42.fr, it sends an HTTP request inside an encrypted HTTPS connection.
+
+A simplified HTTP request looks like:
+
+```text
+GET / HTTP/1.1
+Host: rmedeiro.42.fr
+```
+
+This is called an HTTP request. 
+
+NGINX receives this request and checks its configuration. The request contains information such as:
+
+* Requested resource URL
+* Requested file
+* Requested method
+* Domain name
+* Headers
+* Server configuration
+* Authentication data
+
+Then it decides what to do.
+
+NGINX can:
+
+* Serve the requested file directly
+* Forward the request to PHP-FPM
+* Redirect the request
+* Deny the request
+* Return an error page
+
+This decision happens for every request. That is why NGINX can be understood as a ``request router``. It receives the request first and sends it to the correct destination.
 
 ```text
 The browser sends a request.
@@ -152,56 +188,15 @@ NGINX analyzes the request.
 NGINX decides how the request should be handled.
 ```
 
-NGINX either:
-
-* serves the requested file itself;
-* forwards the request to PHP-FPM;
-* redirects the request;
-* denies the request;
-* returns an error page.
-
-This decision-making process happens for every single request.
-
-When we type https://rmedeiro.42.fr, the browser sends something similar to:
-
-```text
-GET / HTTP/1.1
-Host: rmedeiro.42.fr
-```
-
-This is called an HTTP request.
-
-The request contains information such as:
-
-* Requested resource
-* Domain name
-* Headers
-* Cookies
-* Authentication data
-* Request method
-
 Example:
 
 ```text
-GET /index.php means "I want the file index.php".
+GET /index.php - means "I want the file index.php".
 
-GET /wp-content/uploads/logo.png means "I want the image logo.png".
+GET /wp-content/uploads/logo.png - means "I want the image logo.png".
 ```
 
-NGINX receives these requests and begins analyzing them.
-
-Now, think of NGINX as a receptionist in a large company. People arrive at the reception desk. The receptionist asks: What do you need?
-
-Depending on the answer, the receptionist sends the visitor to the correct department.
-
-NGINX does exactly the same thing. Every request arrives at NGINX first. NGINX examines:
-
-* Requested URL
-* Requested file
-* Request type
-* Server configuration
-
-and then decides: Can I handle this myself? or Do I need to forward this elsewhere?
+NGINX receives these requests and begins analyzing them. Think of NGINX as a receptionist in a large company. People arrive at the reception desk. The receptionist asks: What do you need? Depending on the answer, the receptionist sends the visitor to the correct department. NGINX does exactly the same thing. Every request arrives at NGINX first. NGINX examines and then decides: Can I handle this myself? or Do I need to forward this elsewhere?
 
 This is why NGINX is often called a:
 
@@ -209,6 +204,8 @@ This is why NGINX is often called a:
 * Gateway
 * Request Router
 * Traffic Controller
+
+---
 
 # Understanding Static Content
 
@@ -301,7 +298,9 @@ But NGINX does not understand PHP instructions. If NGINX tried to execute this f
 
 That is why PHP-FPM exists.
 
-## What Is PHP-FPM's Job?
+---
+
+# How NGINX Knows When To Use PHP-FPM
 
 PHP-FPM means: ``PHP FastCGI Process Manager``. Its entire purpose is:
 
@@ -313,11 +312,66 @@ NGINX acts as the receptionist.
 
 PHP-FPM acts as the worker that actually performs the task.
 
+NGINX knows when to forward a request to PHP-FPM because of its configuration file.
+
+The important part is usually:
+
+```text
+location ~ \.php$ {
+	include fastcgi_params;
+	fastcgi_pass wordpress:9000;
+	fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+}
+```
+
+This block means: If the requested file ends in .php, send the request to PHP-FPM.
+
+Examples of PHP files:
+
+```text
+/index.php
+/wp-login.php
+/wp-admin/index.php
+```
+
+NGINX cannot execute PHP code itself. NGINX is a web server, not a PHP interpreter. PHP-FPM is responsible for executing PHP code. So, when NGINX detects a PHP request, it forwards that request to: wordpress:9000. Here, 9000 is the port where PHP-FPM is listening. Docker internal DNS allows NGINX to resolve wordpress to the IP address of the WordPress container.
+
 The flow becomes:
 
 > Browser asks for a dynamic WordPress page  -> NGINX receives the request  -> NGINX forwards it to PHP-FPM  -> PHP-FPM executes WordPress PHP code  -> WordPress queries MariaDB if needed  -> HTML is generated  -> NGINX sends the generated HTML to the browser
 
-This is why NGINX is often described as a ``request router``. It receives the request first and routes it to the correct place.
+---
+
+# What Is FastCGI?
+
+FastCGI is the protocol used by NGINX to communicate with PHP-FPM.
+
+A protocol is a set of rules that defines how two programs communicate and exchange information.
+
+In this project:
+
+```text
+HTTP/HTTPS
+    Browser communicates with NGINX
+
+FastCGI
+    NGINX communicates with PHP-FPM
+
+SQL
+    WordPress communicates with MariaDB
+```
+
+When NGINX forwards a PHP request to PHP-FPM, it sends FastCGI parameters. For example:
+
+```text
+SCRIPT_FILENAME=/var/www/html/index.php
+REQUEST_METHOD=GET
+QUERY_STRING=
+DOCUMENT_ROOT=/var/www/html
+SERVER_NAME=rmedeiro.42.fr
+```
+
+SCRIPT_FILENAME tells PHP-FPM which PHP file must be executed. PHP-FPM receives the FastCGI request, executes the PHP file, and returns the generated output to NGINX. NGINX then sends the final HTTP response back to the browser.
 
 ---
 
@@ -413,6 +467,8 @@ HTTPS
     required for secure login pages
 ```
 
+---
+
 # NGINX and WordPress
 
 WordPress is written in PHP. PHP files are not sent directly to the browser as source code. They must be executed on the server.
@@ -473,26 +529,6 @@ NGINX sends HTML response to the browser
 ```
 
 So NGINX is the public web server that connects the browser to WordPress.
-
-# What Is FastCGI?
-
-FastCGI is the protocol used by NGINX to communicate with PHP-FPM.
-
-A protocol is a set of rules that defines how two programs exchange information.
-
-When NGINX forwards a PHP request to PHP-FPM, it sends information such as:
-
-```text
-SCRIPT_FILENAME=/var/www/html/index.php
-REQUEST_METHOD=GET
-QUERY_STRING=
-DOCUMENT_ROOT=/var/www/html
-SERVER_NAME=rmedeiro.42.fr
-```
-
-The most important value is ``SCRIPT_FILENAME``. This tells PHP-FPM which PHP file must be executed. For example, ``SCRIPT_FILENAME=/var/www/html/index.php``.
-
-PHP-FPM receives that FastCGI request, executes the PHP file, and returns the generated output to NGINX. NGINX then sends the final HTTP response back to the browser. So NGINX does not generate the WordPress page by itself. It delegates PHP execution to PHP-FPM.
 
 ---
 
