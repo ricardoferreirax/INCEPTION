@@ -1279,10 +1279,51 @@ NGINX
     forwards PHP requests to WordPress/PHP-FPM on wordpress:9000
 ```
 
+This configuration connects the public web server to the internal WordPress container.
+
+``root /var/www/html``: This lets NGINX read the WordPress files from the shared volume.
+
+``try_files $uri $uri/ /index.php?$args``: This allows WordPress routes and permalinks to work.
+
+``fastcgi_pass wordpress:9000``: This forwards PHP execution to PHP-FPM inside the WordPress container.
+
+``fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name``: - This tells PHP-FPM which file to execute.
+
+Together, they create the request flow:
+
+```text
+Browser
+   │
+   │ HTTPS
+   ▼
+NGINX
+   │
+   ├── Static file?
+   │       └── Serve directly from /var/www/html
+   │
+   └── PHP or dynamic route?
+           └── Send to WordPress/PHP-FPM
+                    │
+                    ▼
+                WordPress executes PHP
+                    │
+                    ▼
+                MariaDB may be queried
+                    │
+                    ▼
+                HTML is generated
+                    │
+                    ▼
+                NGINX returns response
+```
+
+NGINX is the secure public gateway that knows how to receive browser requests and route them correctly to the internal services.
+
 Without this configuration file, NGINX would not know how to act as the front server of the Inception project.
 
+---
 
-### server
+## server
 
 The block:
 
@@ -1512,24 +1553,27 @@ PHP-FPM needs this information to correctly understand and execute the PHP reque
 
 Without these parameters, PHP-FPM would not receive enough context to execute the PHP request properly.
 
-``fastcgi_pass wordpress:9000;`` tells NGINX where PHP-FPM is located. In this project, ``wordpress`` is the Docker Compose service name of the WordPress container. Docker provides internal DNS, so NGINX can resolve wordpress to the WordPress container IP address. 9000 is the port where PHP-FPM listens.
+``fastcgi_pass wordpress:9000;`` tells NGINX where PHP-FPM is located and where to send the PHP requests. 
+
+In this project, ``wordpress`` is the Docker Compose service name of the WordPress container. Docker provides internal DNS, so NGINX can resolve wordpress to the WordPress container IP address. The port 9000 is where PHP-FPM listens inside WordPress container.
 
 So this directive means: Send PHP requests to PHP-FPM inside the WordPress container.
 
 This line is the bridge between NGINX and WordPress.
 
-``fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;`` tells PHP-FPM the exact PHP file to execute. For example, if:
+Without this directive, NGINX would not know where to send PHP files.
 
-```text
-$document_root = /var/www/html
-$fastcgi_script_name = /index.php
-```
+``fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;`` tells PHP-FPM the full path of the PHP file that must be executed. 
 
-then, SCRIPT_FILENAME = /var/www/html/index.php. 
+The variable $document_root contains the value from the root directive. In this case: /var/www/html.
+
+The variable $fastcgi_script_name contains the requested PHP script path. For example: /index.php.
+
+Together, $document_root$fastcgi_script_name, becomes /var/www/html/index.php. So PHP-FPM receives SCRIPT_FILENAME=/var/www/html/index.php. This tells PHP-FPM exactly which PHP file to execute.
 
 PHP-FPM needs this because it receives a FastCGI request, not a normal browser request. It must know the real filesystem path of the PHP file.
 
-Without SCRIPT_FILENAME, PHP-FPM may not know which file to execute, and PHP requests may fail.
+Without SCRIPT_FILENAME, PHP-FPM may not know which file to execute, and PHP requests may fail. PHP-FPM might receive the request but not know which file to run.
 
 ---
 
@@ -1779,39 +1823,3 @@ Replace the script with NGINX and keep NGINX in the foreground.
 This keeps the container alive.
 
 ---
-
-# Complete NGINX Startup Sequence
-
-```text
-docker compose up
-        │
-        ▼
-NGINX container starts
-        │
-        ▼
-ENTRYPOINT runs init_nginx.sh
-        │
-        ▼
-Environment variables are validated
-        │
-        ▼
-SSL directory is created
-        │
-        ▼
-Self-signed certificate is generated if missing
-        │
-        ▼
-NGINX configuration is generated
-        │
-        ▼
-Configuration points PHP requests to wordpress:9000
-        │
-        ▼
-exec nginx -g "daemon off;"
-        │
-        ▼
-PID 1 becomes NGINX
-        │
-        ▼
-Browser can access https://rickymercury.42.fr
-```
