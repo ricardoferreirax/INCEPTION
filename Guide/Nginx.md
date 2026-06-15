@@ -954,6 +954,10 @@ Think about entering an airport. We show the passport to identify ourselves but 
 
 The certificate can be seen by everyone. The private key must never be shared.
 
+---
+
+## Generating the Certificate and Private Key With OpenSSL
+
 The initialization script can generate the certificate and private key using OpenSSL:
 
 ```text
@@ -976,21 +980,55 @@ After execution, two files are both created:
 * /etc/nginx/ssl/inception.key
 * /etc/nginx/ssl/inception.crt
 
-The ``req`` command is used to create certificate requests and certificates. In this case, it is used to generate a self-signed certificate directly.
+### openssl req
 
-The ``-x509`` tells OpenSSL to generate a self-signed X.509 certificate. X.509 is the standard format used for TLS certificates.
+The ``req`` command is used to create certificate requests and certificates. Normally, a production workflow could be:
 
-The ``-nodes`` means the private key should not be encrypted with a passphrase. This is useful in Docker because NGINX must be able to start automatically. If the private key required a passphrase, NGINX would ask for it at startup. That would block container automation.
-So ``-nodes`` allows NGINX to read the private key without human input.
+* Create certificate signing request
+* Send request to Certificate Authority
+* Certificate Authority signs it
+* Receive trusted certificate
 
-The ``-days 365`` sets the certificate validity period to 365 days. After that period, the certificate expires.
+In this project, we skip the external Certificate Authority. We generate a self-signed certificate directly.
 
-The ``-newkey rsa:2048`` creates a new RSA private key with a size of 2048 bits. For Inception, it is mainly used for server authentication and TLS certificate generation. The key size gives more security.
+### -x509
 
-The ``-keyout /etc/nginx/ssl/inception.key`` tells OpenSSL where to write the private key. Writes the private key to /etc/nginx/ssl/inception.key.This file contains secret cryptographic information. NGINX uses this file internally during TLS handshakes.
+The ``-x509`` tells OpenSSL to generate a self-signed X.509 certificate. X.509 is the standard format used for TLS certificates. Browsers, servers and TLS libraries understand this format.
 
-The ``-out /etc/nginx/ssl/inception.crt`` tells OpenSSL where to write the certificate. Writes the certificate key to /etc/nginx/ssl/inception.crt.
+### -nodes
+
+This tells OpenSSL not to encrypt the private key with a passphrase. This is useful in Docker because NGINX must start automatically.
+
+If the private key required a passphrase, NGINX would ask for it and stop at startup for manual input. That would break container automation.
+
+So -nodes allows NGINX to read the private key without human interaction input.
+
+### -days 365
+
+This sets the certificate validity period to 365 days. After that, the certificate expires. An expired certificate will usually produce browser warnings.
+
+### -newkey rsa:2048
+
+This creates a new RSA private key with a size of 2048 bits. For Inception, it is mainly used for server authentication and TLS certificate generation. RSA is an asymmetric cryptography algorithm. Asymmetric means it uses a key pair:
+
+* public key
+* private key
+
+The number 2048 defines the key size. Larger keys are usually stronger but more computationally expensive. For a local Inception project, 2048 is acceptable.
+
+### -keyout
+
+The ``-keyout /etc/nginx/ssl/inception.key`` tells OpenSSL where to write the private key. Writes the private key to ``/etc/nginx/ssl/inception.key``.
+
+This file contains secret cryptographic information. NGINX uses this file internally during TLS handshakes.
+
+### -out
+
+The ``-out /etc/nginx/ssl/inception.crt`` tells OpenSSL where to write the certificate. Writes the certificate key to ``/etc/nginx/ssl/inception.crt``.
+
 Unlike the private key, the certificate is public. Every browser that connects to NGINX receives a copy of the certificate. It does NOT contain the private key. Only the public key.
+
+### -subj
 
 The ``-subj "/C=PT/ST=Lisbon/L=Lisbon/O=42/OU=Inception/CN=rmedeiro.42.fr"`` fills the certificate indentity information without interactive prompts. Normally OpenSSL would ask questions interactively:
 
@@ -1000,6 +1038,19 @@ The ``-subj "/C=PT/ST=Lisbon/L=Lisbon/O=42/OU=Inception/CN=rmedeiro.42.fr"`` fil
 * Common Name?
 
 The -subj option answers them automatically.
+
+The fields mean:
+
+```text
+C   = Country
+ST  = State or region
+L   = Locality or city
+O   = Organization
+OU  = Organizational Unit
+CN  = Common Name
+```
+
+The most important field is ``CN=rmedeiro.42.fr``, because it identifies the domain name.
 
 ---
 
@@ -1031,45 +1082,91 @@ The result is a smaller and cleaner Docker image.
 COPY ./tools/init_nginx.sh /usr/local/bin/init_nginx.sh
 ```
 
-This instruction copies the custom NGINX initialization script from the host machine into the Docker image.
+This instruction copies the custom NGINX initialization script into the Docker image.
 
-The Source path ``./tools/init_nginx.sh`` exists on the host machine during image creation. Inside the project:
+This script is one of the most important parts of the NGINX container because the Dockerfile only installs the required software, but the script prepares the service for the specific Inception environment.
+
+At this point, the image already has:
+
+* Debian
+* NGINX
+* OpenSSL
+
+However, NGINX is still not configured for the project. It does not yet know:
+
+* which domain it should serve
+* which port it should listen on
+* where the WordPress files are located
+* where the SSL certificate is located
+* where the private key is located
+* where PHP requests should be forwarded
+
+That project-specific configuration is created by init_nginx.sh.
+
+The syntax is: COPY <source> <destination>
+
+In this case:
 
 ```text
-srcs/
-└── requirements/
-    └── nginx/
-        ├── Dockerfile
-        └── tools/
-            └── init_nginx.sh
+Source:
+	./tools/init_nginx.sh
+
+Destination:
+	/usr/local/bin/init_nginx.sh
 ```
 
-Docker reads this file while building the image.
+The source file exists in the project directory on the host machine. During the image build, Docker reads this file and physically copies it from the host machine into the Docker image filesystem. After the copy, the image contains: ``/usr/local/bin/init_nginx.sh``. Every container created from this image will contain this script.
 
-The file is physically copied into the image.
-
-The Destination Path ``/usr/local/bin/init_nginx.sh`` exists inside the image filesystem. 
-
-The path ``/usr/local/bin`` has a special meaning in Linux. Traditionally, here, is where the custom executables are installed manually.
+The directory ``/usr/local/bin`` is commonly used in Linux for custom executable scripts installed manually by the developer or administrator. It is normally included in the system PATH. PATH is an environment variable that contains the list of directories where Linux searches for commands.
 The Linux shell automatically searches these directories when a command is executed.
 
-Linux automatically finds the script.
-
-
-After the copy:
-
-```text
-Container
-│
-├── /usr/local/bin/
-│       └── init_nginx.sh
-│
-└── ...
-```
+So, as the script is inside /usr/local/bin, Docker can later execute ``ENTRYPOINT ["init_nginx.sh"]`` instead of needing the full path. The script becomes available as a normal command inside the container.
 
 The script now becomes part of the image itself. Every container created from this image will automatically contain that script.
 
 So, this line transforms a generic Debian container with NGINX installed into a fully configured web server capable of serving the Inception website.
+
+---
+
+## Why the Initialization Script Is Needed
+
+The script is needed because some parts of the NGINX setup only make sense at runtime.
+
+The Dockerfile runs during image build time.
+
+The script runs when the container starts.
+
+During image build time, Docker does not yet have the final runtime context. For example, the following values are usually only available when Docker Compose starts the container:
+
+```text
+DOMAIN_NAME
+PHP_FPM_HOST
+PHP_FPM_PORT
+Docker network
+WordPress container name
+Mounted WordPress volume
+Generated SSL certificate path
+```
+
+So the Dockerfile should not try to fully configure NGINX with final project values.
+
+Instead:
+
+```text
+Dockerfile
+    installs NGINX and OpenSSL
+    copies the script
+    makes the script executable
+
+init_nginx.sh
+    checks environment variables
+    creates SSL directory
+    generates certificate and private key
+    creates NGINX configuration file
+    starts NGINX
+```
+
+This keeps the image reusable and the configuration flexible.
 
 Without this script, the image would contain:
 
@@ -1094,81 +1191,36 @@ The image would contain software, but it would not know how to use it. This is e
 
 ---
 
-## Why the Script Is Needed
+## Why NGINX Needs a Configuration File
 
-The script is needed because some configuration depends on runtime values.
+NGINX is controlled by configuration files.
 
-For example:
+The NGINX binary itself is only the program.
 
-* `DOMAIN_NAME`;
-* `PHP_FPM_HOST`;
-* `PHP_FPM_PORT`;
-* generated SSL certificate path;
-* generated NGINX configuration.
+The configuration file tells the program how to behave.
 
-These values may come from the `.env` file and only exist when Docker Compose starts the container.
+Without a configuration file, NGINX would not know:
 
-The script can use those values to generate the final NGINX configuration dynamically.
+* which port to listen on
+* which domain name to accept
+* where the website root directory is
+* which SSL certificate to use
+* which private key to use
+* how to handle normal URLs
+* how to handle PHP files
+* where PHP-FPM is located
 
-For example, it can create a config containing:
+In this project, the script usually creates a file such as: ``/etc/nginx/conf.d/default.conf``.
 
-```nginx
-server_name rickymercury.42.fr;
-fastcgi_pass wordpress:9000;
-ssl_certificate /etc/nginx/ssl/inception.crt;
-ssl_certificate_key /etc/nginx/ssl/inception.key;
-```
-
-This is runtime-specific configuration.
-
-It should not be hardcoded blindly inside the Dockerfile.
-
----
-
-## Why The Configuration Must Be Generated At Runtime
+This file becomes the main website configuration for the container.
 
 The NGINX configuration depends on values that only exist when the container starts.
 
-Examples:
+---
+
+## Example NGINX Configuration
 
 ```text
-DOMAIN_NAME=rickymercury.42.fr
-PHP_FPM_HOST=wordpress
-PHP_FPM_PORT=9000
-```
-
-These values come from:
-
-* .env
-* docker-compose.yml
-* container environment
-
-The Dockerfile cannot use these values during build time. The initialization script can.
-
-The same image can work with different domains and services.
-
-# Why NGINX Needs a Configuration File
-
-NGINX behavior is controlled by configuration files.
-
-The script usually creates a file such as:
-
-```text
-/etc/nginx/conf.d/default.conf
-```
-
-This file tells NGINX:
-
-* which port to listen on;
-* which domain name to accept;
-* where the website files are stored;
-* where the SSL certificate is located;
-* how to handle PHP files;
-* where to forward PHP requests.
-
-A simplified configuration looks like:
-
-```nginx
 server {
 	listen 443 ssl;
 	server_name rmedeiro.42.fr;
@@ -1191,7 +1243,8 @@ server {
 }
 ```
 
-This configuration is what connects NGINX to WordPress.
+This configuration is what connects the browser, NGINX, WordPress and PHP-FPM.
+
 
 ### server
 
@@ -1199,126 +1252,69 @@ The block:
 
 ```text
 server {
-
+	...
 }
 ```
 
-Defines a virtual server. It is a website definition. 
+Defines one virtual server. A virtual server is basically one website definition.
 
-NGINX can host multiple websites. 
+NGINX can host multiple websites at the same time. Each website can have its own server block.
 
-Each website normally has its own server block.
+For this project, one server block is enough because the Inception website uses one domain: ``rmedeiro.42.fr``.
+
+Everything inside this block tells NGINX how to serve that website.
 
 ### listen 443 ssl
 
-Tells NGINX to accept connections on port 443 (Use HTTPS).
+This tells NGINX to listen for incoming connections on port 443. Port 443 is the standard HTTPS port.
 
-Without this: No HTTPS support.
+The ssl part tells NGINX that this server block uses TLS/HTTPS.
+
+Without this directive, NGINX would not accept HTTPS traffic on port 443.
+
+The browser connects to: https://rmedeiro.42.fr and because HTTPS normally uses port 443, the request reaches this server block.
 
 ### server_name
 
-``server_name rmedeiro.42.fr;`` defines which domain belongs to this server block.
+``server_name rmedeiro.42.fr;`` tells NGINX which domain name belongs to this server block.
 
-When NGINX receives: ``Host: rmedeiro.42.fr``, it knows this configuration should handle the request.
+When a browser sends a request, it includes the domain in the Host header: ``Host: rmedeiro.42.fr``.
+
+NGINX compares that value with server_name. If it matches, NGINX uses this configuration.
+
+So this directive connects the domain name to the correct website configuration.
 
 ### root
 
 ``root /var/www/html;`` defines the website root directory.
 
-NGINX searches files here.
+``root /var/www/html;`` tells NGINX where the website files are stored.
 
-Example:
+In this project, WordPress files are stored in ``/var/www/html``. This directory is shared between the WordPress container and the NGINX container through a Docker volume. The WordPress container writes files there and NGINX reads files from there. For example, if the browser requests ``/wp-content/uploads/logo.png``, NGINX searches for ``/var/www/html/wp-content/uploads/logo.png``.
 
-Request: ``/logo.png``.
-NGINX searches: ``/var/www/html/logo.png``.
+So root defines the base directory used to resolve requested files.
 
 ### index
 
 ``index index.php index.html;`` defines default files.
 
-Example:
+This tells NGINX which default files to try when the browser requests a directory. For example, when the browser requests https://rmedeiro.42.fr/ it is asking for the root directory of the site. NGINX then tries default index files such as:
 
-``https://rmedeiro.42.fr/`` becomes: ``index.php`` or ``index.html``.
+* index.php
+* index.html
 
+For WordPress, index.php is especially important because it is the main entry point of the application. Most dynamic WordPress requests eventually pass through index.php.
 
 ### ssl_certificate
 
-``ssl_certificate /etc/nginx/ssl/inception.crt;`` tells NGINX where the TLS certificate is stored. This certificate is sent to the browser during the TLS handshake.
+``ssl_certificate /etc/nginx/ssl/inception.crt;`` tells NGINX where the TLS certificate is stored. The certificate is sent to the browser during the TLS handshake. It identifies the server and contains the public key. Without a certificate, NGINX cannot properly serve HTTPS.
 
 ### ssl_certificate_key
 
-``ssl_certificate_key /etc/nginx/ssl/inception.key;`` tells NGINX where the private key is stored.
-
-Without this key: TLS cannot work.
-
-### location /
-
-Matches normal website requests.
-
-### try_files
-
-``try_files $uri $uri/ /index.php?$args;``
-
-WordPress URLs often look like:
-
-```text
-/about
-/contact
-/blog/my-post
-```
-
-These files do not physically exist. WordPress generates them dynamically.
-
-This directive tells NGINX: ``Try real file``. If not found, send request to index.php, which allows WordPress routing to work.
-
-### location ~ .php$
-
-Matches PHP files.
-
-Examples:
-
-```text
-index.php
-wp-login.php
-wp-admin/index.php
-fastcgi_pass
-fastcgi_pass wordpress:9000;
-```
-
-This is where NGINX connects to PHP-FPM.
-
-### listen
-
-The listen tells NGINX which port to accept connections on.
-
-For Inception: ``listen 443 ssl;`` means Listen for HTTPS connections on port 443.
-
-Port 443 is the standard HTTPS port.
-
-### server_name
-
-The server_name tells NGINX which domain this configuration applies to.
-
-Example: ``server_name rmedeiro.42.fr;``. When the browser requests ``https://rmedeiro.42.fr``, NGINX can match that request to this server block.
-
-### root
-
-The root tells NGINX where the website files are stored.
-
-Example: ``root /var/www/html;`` means NGINX will look for files inside ``/var/www/html``. This directory is shared with the WordPress container through a Docker volume. WordPress writes files there.
-NGINX reads files from there.
-
-### index
-
-The index tells NGINX which file to try first when a directory is requested.
-
-Example: ``index index.php index.html;``. If the browser requests ``https://rmedeiro.42.fr/``, NGINX tries to load ``index.php`` or ``index.html`` depending on what exists and how the configuration routes the request.
+``ssl_certificate_key /etc/nginx/ssl/inception.key;`` tells NGINX where the private key is stored. The private key must match the certificate.
+NGINX uses this key during the TLS handshake to prove that it owns the certificate. If the key is missing or does not match the certificate, NGINX may fail to start or HTTPS will not work correctly.
 
 ### location /
-
-A location block defines how NGINX should handle certain request paths.
-
-Example:
 
 ```text
 location / {
@@ -1326,19 +1322,42 @@ location / {
 }
 ```
 
-This is very important for WordPress.
+A location block tells NGINX how to handle specific request paths. The ``location /`` block handles general website requests.
 
-It means:
+The important directive here is try_files.
 
-* Try to serve the exact requested file.
-* If that does not exist, try the requested directory.
-* If neither exists, send the request to index.php.
+### try_files
 
-This allows WordPress permalinks to work.
+``try_files $uri $uri/ /index.php?$args;`` tells NGINX to try three things, in order.
 
-### location ~ \.php$
+First, ``$uri``, try to find the exact requested file.
 
-This block handles PHP files. Example:
+Example:
+
+```text
+Request: /wp-content/uploads/logo.png
+Try:     /var/www/html/wp-content/uploads/logo.png
+```
+
+If the file exists, NGINX serves it directly.
+
+Second, ``$uri/``, try to find the requested path as a directory.
+
+Third, ``/index.php?$args``, if no real file or directory exists, forward the request to index.php.
+
+This is what allows WordPress permalinks to work.
+
+For example:
+
+```text
+/about
+/blog/my-post
+/contact
+```
+
+These paths usually do not exist as real files inside /var/www/html. WordPress generates them dynamically. So NGINX falls back to /index.php and WordPress decides what content to show. The ``$args`` part preserves query parameters. Example: ``/page?id=10``. The id=10 part is kept and passed to WordPress.
+
+### location ~ .php$
 
 ```text
 location ~ \.php$ {
@@ -1348,29 +1367,49 @@ location ~ \.php$ {
 }
 ```
 
-This means: If the requested file ends in .php, send it to PHP-FPM.
+This block handles PHP files. The expression: ``~ \.php$`` means: Match requests that end with .php.
 
-The directive: ``fastcgi_pass wordpress:9000;`` tells NGINX to forward the request to PHP-FPM inside the WordPress container.
+Examples:
 
-The directive: ``fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;`` tells PHP-FPM the exact PHP file to execute. For example: ``/var/www/html/index.php``.
+```text
+/index.php
+/wp-login.php
+/wp-admin/index.php
+```
 
-Without this parameter, PHP-FPM might not know which file to run.
+NGINX does not execute PHP itself. So when a PHP file is requested, NGINX forwards it to PHP-FPM.
 
+``include fastcgi_params;`` includes default FastCGI parameters provided by NGINX. These parameters pass important request information to PHP-FPM, such as:
+
+* request method
+* query string
+* content type
+* content length
+* server protocol
+* request URI
+
+PHP-FPM needs this information to correctly execute the PHP request.
+
+``fastcgi_pass wordpress:9000;`` tells NGINX where PHP-FPM is located. In this project, ``wordpress`` is the Docker Compose service name of the WordPress container. Docker provides internal DNS, so NGINX can resolve wordpress to the WordPress container IP address. 9000 is the port where PHP-FPM listens.
+
+So this directive means: Send PHP requests to PHP-FPM inside the WordPress container.
+
+This line is the bridge between NGINX and WordPress.
+
+``fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;`` tells PHP-FPM the exact PHP file to execute. For example, if:
+
+```text
+$document_root = /var/www/html
+$fastcgi_script_name = /index.php
+```
+
+then, SCRIPT_FILENAME = /var/www/html/index.php. 
+
+PHP-FPM needs this because it receives a FastCGI request, not a normal browser request. It must know the real filesystem path of the PHP file.
+
+Without SCRIPT_FILENAME, PHP-FPM may not know which file to execute, and PHP requests may fail.
 
 ---
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # Making the Script Executable
 
