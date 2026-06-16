@@ -1585,25 +1585,22 @@ RUN chmod +x /usr/local/bin/init_nginx.sh
 
 This instruction gives execution permission to the initialization script.
 
-Copying a script into the image does not automatically make it executable.
-
-Linux permissions determine whether a file can be run as a program.
-
-Without execute permission, Docker could fail with:
+After the copy, the file physically exists inside the image filesystem:
 
 ```text
-Permission denied
+Container Filesystem
+│
+└── /usr/local/bin/
+        └── init_nginx.sh
 ```
 
-when trying to execute the entrypoint.
+However, Linux still sees it simply as a file. At this point Linux knows that a file exists, but Linux does not necessarily know that this file should be executed. The file may contain shell commands, but without execute permission Linux treats it as ordinary data. Merely existing is not enough. 
 
-The command:
+So, copying a script into the image does not automatically guarantee that Linux can execute it. A file can exist and still not be executable.
 
-```bash
-chmod +x /usr/local/bin/init_nginx.sh
-```
+The operating system must also allow execution.
 
-adds execute permission.
+Linux permissions control what can be done with a file. Without this line, Docker could fail when starting the container with an error like: Permission denied. This would happen because the ENTRYPOINT tries to execute the file directly.
 
 ---
 
@@ -1612,6 +1609,102 @@ adds execute permission.
 ```Dockerfile
 EXPOSE 443
 ```
+
+This instruction declares that the NGINX container is designed to listen for incoming connections on port 443.
+
+As we know, Docker containers have their own isolated networking environment. This means that each container has:
+
+* its own network interfaces;
+* its own IP address inside the Docker network;
+* its own ports;
+* its own routing tables.
+
+For example:
+
+```text
+NGINX Container: Port 443
+
+WordPress Container: Port 9000
+
+MariaDB Container: Port 3306
+```
+
+EXPOSE does not actually publish the port. EXPOSE helps describe the intended behavior of the container. It tells which ports are expected to be used.
+
+The NGINX container can listen on port 443, the WordPress on port 9000 and MariaDB on port 3306. All simultaneously.
+
+Each container can use the same port numbers without conflict because they are isolated from each other.
+
+As EXPOSE 3306 means: This image runs a database server and EXPOSE 9000 means: This image runs PHP-FPM, EXPOSE 443 means: This image is intended to run an HTTPS service.
+
+When Docker sees EXPOSE 443, it stores metadata inside the image. That metadata essentially says: "The application inside this image is expected to use port 443". This information becomes part of the image description. Docker now knows that the intended network service runs on port 443. 
+
+When we say: NGINX listens on port 443, it means that NGINX is continuously waiting for incoming connections on that port.
+
+Whenever a browser tries to connect:
+
+> Browser -> Port 443 -> NGINX
+
+the operating system delivers that connection to NGINX.
+
+In the Inception project, NGINX listens on 443 because Port `443` is the standard HTTPS port.
+
+A very common misconception is that EXPOSE 443 opens port 443. This is not true.
+
+The EXPOSE instruction does not open any port, does not publish any port to the host machine, and does not make the container reachable from the Internet.
+
+EXPOSE does not:
+
+* Open firewall rules
+* Publish the port
+* Allow Internet access
+* Create host mappings
+* Forward traffic
+* Make the container reachable
+
+The container remains isolated. External users still cannot connect to it.
+
+---
+
+## What Is A Network Port?
+
+When two computers communicate over a network, they need a way to identify not only the machine they want to reach, but also the specific service running on that machine.
+
+An IP address identifies the machine, for example 192.168.1.50. But a single machine can run many services simultaneously:
+
+```text
+NGINX
+MariaDB
+SSH
+FTP
+DNS
+```
+
+If a request arrives at the machine, how does the operating system know which service should receive it? That is exactly why ports exist. A port identifies a specific service running on a machine. For example:
+
+```text
+SSH      192.168.1.50:22
+
+HTTP     192.168.1.50:80
+
+HTTPS    192.168.1.50:443
+
+MariaDB  192.168.1.50:3306
+```
+
+Think of the IP address as a building address and the port as an apartment number. The building identifies where the request should go and the apartment identifies who inside the building should receive it.
+
+
+
+
+
+
+
+
+
+
+
+
 
 This instruction documents that the NGINX container listens on port `443`.
 
