@@ -1612,115 +1612,49 @@ EXPOSE 443
 
 This instruction declares that the NGINX container is designed to listen for incoming connections on port 443.
 
-As we know, Docker containers have their own isolated networking environment. This means that each container has:
+--- 
 
-* its own network interfaces;
-* its own IP address inside the Docker network;
-* its own ports;
-* its own routing tables.
+# What Is A Network?
 
-For example:
+A network is a group of devices that can communicate with each other. If these devices can exchange data, they are part of a network. For example, when we open https://rmedeiro.42.fr, browser sends data through several networks until it reaches the server. A network can be:
+
+* Local Network (LAN)
+* Home Network
+* Company Network
+* Internet
+* Docker Network
+
+In Docker, containers are connected through virtual networks. For Inception, all three containers belong to the same Docker network, because they are on the same network, they can communicate using service names, instead of IP addresses.
+
+A network allows machines to communicate. However, a single machine can run multiple services simultaneously. For example: SSH, NGINX, MariaDB, FTP, DNS.
+
+If a request arrives at a machine, how does Linux know which service should receive it? That is the purpose of ports. A port identifies a specific service running on a machine. Example:
 
 ```text
-NGINX Container: Port 443
+Machine IP: 192.168.1.10
 
-WordPress Container: Port 9000
+Could have: 
 
-MariaDB Container: Port 3306
+SSH 192.168.1.10:22
+
+HTTP 192.168.1.10:80
+
+HTTPS 192.168.1.10:443
+
+MariaDB 192.168.1.10:3306
 ```
 
-EXPOSE does not actually publish the port. EXPOSE helps describe the intended behavior of the container. It tells which ports are expected to be used.
+Building Address = IP Address  |  Apartment Number = Port  -> The IP identifies the building and the port identifies the apartment.
 
-The NGINX container can listen on port 443, the WordPress on port 9000 and MariaDB on port 3306. All simultaneously.
-
-Each container can use the same port numbers without conflict because they are isolated from each other.
-
-As EXPOSE 3306 means: This image runs a database server and EXPOSE 9000 means: This image runs PHP-FPM, EXPOSE 443 means: This image is intended to run an HTTPS service.
-
-When Docker sees EXPOSE 443, it stores metadata inside the image. That metadata essentially says: "The application inside this image is expected to use port 443". This information becomes part of the image description. Docker now knows that the intended network service runs on port 443. 
-
-When we say: NGINX listens on port 443, it means that NGINX is continuously waiting for incoming connections on that port.
+When we say: NGINX listens on port 443 it means NGINX is waiting for incoming connections on that port.
 
 Whenever a browser tries to connect:
 
 > Browser -> Port 443 -> NGINX
 
-the operating system delivers that connection to NGINX.
+the operating system delivers that connection to NGINX. In the Inception project, NGINX listens on 443 because Port `443` is the standard HTTPS port.
 
-In the Inception project, NGINX listens on 443 because Port `443` is the standard HTTPS port.
-
-A very common misconception is that EXPOSE 443 opens port 443. This is not true.
-
-The EXPOSE instruction does not open any port, does not publish any port to the host machine, and does not make the container reachable from the Internet.
-
-EXPOSE does not:
-
-* Open firewall rules
-* Publish the port
-* Allow Internet access
-* Create host mappings
-* Forward traffic
-* Make the container reachable
-
-The container remains isolated. External users still cannot connect to it.
-
----
-
-## What Is A Network Port?
-
-When two computers communicate over a network, they need a way to identify not only the machine they want to reach, but also the specific service running on that machine.
-
-An IP address identifies the machine, for example 192.168.1.50. But a single machine can run many services simultaneously:
-
-```text
-NGINX
-MariaDB
-SSH
-FTP
-DNS
-```
-
-If a request arrives at the machine, how does the operating system know which service should receive it? That is exactly why ports exist. A port identifies a specific service running on a machine. For example:
-
-```text
-SSH      192.168.1.50:22
-
-HTTP     192.168.1.50:80
-
-HTTPS    192.168.1.50:443
-
-MariaDB  192.168.1.50:3306
-```
-
-Think of the IP address as a building address and the port as an apartment number. The building identifies where the request should go and the apartment identifies who inside the building should receive it.
-
-
-
-
-
-
-
-
-
-
-
-
-
-This instruction documents that the NGINX container listens on port `443`.
-
-Port `443` is the standard HTTPS port.
-
-This is the only service that should be exposed publicly in the Inception project.
-
-The browser connects to:
-
-```text
-https://rickymercury.42.fr
-```
-
-which reaches NGINX on port 443.
-
-The flow is:
+Conceptually, Port 443 -> NGINX whenever someone connects to https://rmedeiro.42.fr, the operating system receives the connection and delivers it to NGINX. The flow is:
 
 ```text
 Browser
@@ -1738,36 +1672,92 @@ WordPress :9000
 MariaDB :3306
 ```
 
-NGINX exposes port 443.
-
-WordPress only exposes port 9000 internally.
-
-MariaDB only exposes port 3306 internally.
-
 ---
 
-## EXPOSE vs ports
+# Container Networking
 
-`EXPOSE` only documents the port inside the image.
+As we know, Docker containers have their own isolated networking environment. This means that each container has:
 
-It does not publish the port to the host machine by itself.
+* its own network interfaces;
+* its own IP address inside the Docker network;
+* its own ports;
+* its own routing tables.
 
-To make NGINX reachable from the host, Docker Compose must use:
+Example:
 
-```yaml
+```text
+NGINX Container: 172.18.0.2
+                 Port 443
+
+WordPress Container: 172.18.0.3
+                     Port 9000
+
+MariaDB Container: 172.18.0.4
+                   Port 3306
+```
+
+It means: The NGINX container can listen on port 443, the WordPress on port 9000 and MariaDB on port 3306. All simultaneously.
+
+Each container can use the same port numbers without conflict because they are isolated from each other.
+
+Publishing a port means: "Making a container port accessible from outside Docker". Without publishing, the connection between browser and container is not possible. The port exists and the service is running, but nobody outside Docker can reach it.
+
+A container becomes reachable (in other words, a container becomes accesible from outside Docker) when Docker creates a port mapping between a Host Port and Container Port. This is done using:
+
+```text
 ports:
   - "443:443"
 ```
 
-This maps:
+This instruction creates a connection between:  Host Port 443 -> Container Port 443
+
+Now Docker creates forwarding rules. Traffic arriving at hostname machine (Host:443) is automatically forwarded to NGINX Container:443.
+
+Without Publishing:  Browser ---> Host Machine --X--> Docker Container                -> NGINX is running and Port 443 exists, but nobody can reach it.
+
+With Publishing: Browser ----> Host Port 443 ----> Container Port 443 ----> NGINX     -> Now the container is reachable.
+
+---
+
+# What Does EXPOSE Actually Do?
+
+The EXPOSE tells Docker: "The application inside this image is expected to listen on port 443".
+
+When we say: NGINX listens on port 443, it means that NGINX is continuously waiting for incoming connections on that port.
+
+EXPOSE helps describe the intended behaviour of the container. It tells which ports are expected to be used.
+
+When Docker sees EXPOSE 443, it stores metadata inside the image. That metadata essentially says: "The application inside this image is expected to use port 443". This information becomes part of the image description. Docker now knows that the intended network service runs on port 443. 
 
 ```text
-Host port 443 -> Container port 443
+Image Metadata - Service: HTTPS Server  |  Expected Port: 443
 ```
 
-For NGINX, using `ports` is correct because it is the public entry point.
+This is useful because anyone reading the image immediately understands: "This image runs an HTTPS service".
 
-For WordPress and MariaDB, `ports` should usually not be used because they are internal services.
+EXPOSE does not:
+
+* Open firewall rules
+* Publish the port
+* Allow Internet access
+* Map host ports
+* Create fowarding rules
+* Make the container reachable
+
+For example: EXPOSE 443 DOES NOT create: Internet --> Container. The container remains isolated. External users still cannot connect to it.
+
+---
+
+## Why Only NGINX Is Published In Inception?
+
+The Inception architecture is designed so that only NGINX is publicly accessible and reachable from outside. Only NGINX communicates directly with the browser. WordPress and MariaDB should remain private and inside the Docker network. This design provides several benefits:
+
+* Improved Security
+* Better Separation of Responsibilities
+* Reduced Attack Surface
+* Service Separation / Cleaner Architecture
+
+If MariaDB were published:  Internet -> MariaDB, anyone could try to connect directly to the database. That would be a serious security risk. MariaDB should only receive SQL requests from WordPress. Likewise, PHP-FPM should only accept FastCGI requests from NGINX, not direct browser connections.
 
 ---
 
