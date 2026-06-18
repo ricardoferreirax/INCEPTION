@@ -1761,47 +1761,113 @@ If MariaDB were published:  Internet -> MariaDB, anyone could try to connect dir
 
 ---
 
-# Understanding ENTRYPOINT
+## Understanding What A Container Really Is
+
+Many says that a container is a small virtual machine. This is not completely true. A virtual machine boots an entire operating system:
+
+```text
+Hardware
+    │
+    ▼
+Hypervisor
+    │
+    ▼
+Guest Operating System
+    │
+    ▼
+Services
+```
+
+A Docker container works differently. A container shares the host kernel and usually exists to run one main application.
+
+```text
+  Host Linux Kernel
+        │
+        ▼
+  Docker Container
+        │
+        ▼
+   Main Process
+```
+
+A container is often described as: A process running inside an isolated environment.
+
+From Docker's perspective, the container exists because a process exists. If that process stops, container stops.
+
+The container is not a object that lives independently. The container is tied to the lifetime of its main process.
+
+---
+
+## Why Docker Needs A Startup Command
+
+Imagine Docker creates a container from an image. The image contains:
+
+* Debian
+* NGINX
+* OpenSSL
+* Configuration Files
+* Scripts
+
+However, simply having files inside the image does not automatically do anything. The image is only a filesystem.
+
+Docker still needs to know: What should be executed? Which one should run? This is exactly why ENTRYPOINT exists.
+
+ENTRYPOINT answers the question: What program should become the starting point of the container?
+
+---
+
+## Understanding ENTRYPOINT
 
 ```Dockerfile
 ENTRYPOINT ["init_nginx.sh"]
 ```
 
-`ENTRYPOINT` defines the command executed every time the container starts.
+ENTRYPOINT defines the command that Docker automatically executes whenever a container is created from the image.
 
-When Docker starts the NGINX container, it runs:
-
-```bash
-init_nginx.sh
-```
+Think of it as Container Startup Command. Whenever Docker executes docker run nginx-image or docker compose up, Docker performs init_nginx.sh inside the container. This becomes the very first program executed.
 
 This script becomes the first process executed inside the container.
 
-The startup flow is:
+Without an ENTRYPOINT:
+
+> Container Starts -> Nothing Executes -> Container Immediately Exits
+
+Docker expects a process. If no process exists, there's nothing to keep running and the container stops. This is why almost every service container contains an ENTRYPOINT.
+
+Docker needs something to execute. The startup sequence becomes:
 
 ```text
-Container starts
-       │
-       ▼
-ENTRYPOINT executes
-       │
-       ▼
-init_nginx.sh runs
-       │
-       ▼
+      Image Exists
+           │
+           ▼
+  Docker Creates Container
+           │
+           ▼
+    Container starts
+	       │
+           ▼
+   ENTRYPOINT Executes
+           │
+           ▼
+   init_nginx.sh runs
+           │
+           ▼
 Environment variables are checked
-       │
-       ▼
+           │
+           ▼
 SSL certificate is created if needed
-       │
-       ▼
+           │
+           ▼
 NGINX configuration is generated
-       │
-       ▼
-NGINX starts
+           │
+           ▼
+Container Initialization Begins
+           │
+           ▼
+     NGINX starts
 ```
 
-Without this script, the container would have NGINX installed, but it would not know the project-specific domain, SSL certificate or PHP-FPM upstream.
+Without this script, the container would have NGINX installed, but it would not know the project domain, SSL certificate or PHP-FPM upstream.
 
 ---
 
@@ -1813,28 +1879,82 @@ Someone might ask:
 ENTRYPOINT ["nginx"]
 ```
 
-Why not start NGINX directly?
-
-Because NGINX needs project-specific configuration before it starts.
+Why not start NGINX directly? Because NGINX needs a project configuration before it starts.
 
 Before starting NGINX, the container must:
 
 * validate `DOMAIN_NAME`;
 * validate `PHP_FPM_HOST`;
 * validate `PHP_FPM_PORT`;
-* generate or reuse SSL certificates;
+* Know the SSL certificate path
+* Know the private key path
+* Know where WordPress is
+* Know where PHP-FPM is
 * generate the server block configuration;
 * configure FastCGI forwarding to WordPress.
+* Generate the final configuration
 
-NGINX itself only reads configuration files.
+NGINX itself only reads configuration files. It does not automatically know the WordPress service name or project domain. The initialization script prepares those files first, and, then, it starts NGINX.
 
-It does not automatically know the WordPress service name or project domain.
+If those files do not exist:
 
-The initialization script prepares those files first.
+> NGINX -> Reads Configuration -> Configuration Missing -> Startup Failure
 
-Then it starts NGINX.
+So before NGINX starts, a configuration must exist. This is the role of init_nginx.sh. The script acts like a preparation phase.
 
 ---
+
+## Why The Script Runs At Runtime Instead Of Build Time
+
+Why not create everything inside the Dockerfile? Because the Dockerfile executes during Build Time, while the script executes during Runtime
+
+During build time, Dockerfile Executes but:
+
+* WordPress Does Not Exist
+* MariaDB Does Not Exist
+* Containers Do Not Exist
+* Volumes Do Not Exist
+* Secrets Do Not Exist
+
+The image is simply being constructed.
+
+Example: docker build. At this moment Docker only creates the image filesystem. However:
+
+* DOMAIN_NAME
+* PHP_FPM_HOST
+* PHP_FPM_PORT
+* Docker Secrets
+
+only become available later when: docker compose up, starts the container.
+
+```text
+Build Time = Install Software
+
+Runtime = Configure Software
+```
+
+---
+
+# Understanding PID 1
+
+Every process running on Linux receives a Process Identifier. Example:
+
+```text
+PID 1
+PID 2
+PID 3
+PID 4
+```
+
+A PID is simply a unique number used by the kernel to identify a process.
+
+Inside a Docker container there is one very special process: PID 1. This is the first process created inside the container.
+
+Docker considers PID 1 to be The Main Container Process.
+
+The entire life of the container depends on this process.
+
+This rule is fundamental to understanding why exec is used later in the script. The goal is to make NGINX become PID 1, because NGINX is the service that should keep the container alive for the rest of its lifetime.
 
 # Why exec Is Important
 
