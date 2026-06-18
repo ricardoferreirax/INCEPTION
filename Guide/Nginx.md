@@ -1761,34 +1761,92 @@ If MariaDB were published:  Internet -> MariaDB, anyone could try to connect dir
 
 ---
 
-## Understanding What A Container Really Is
+# Understanding What A Container Really Is
 
-Many says that a container is a small virtual machine. This is not completely true. A virtual machine boots an entire operating system:
+When a computer is powered on, several layers are involved. A simplified view looks like:
+
+> Applications -> Operating System -> Kernel -> Hardware
+
+The hardware is the physical machine. Has CPU, RAM, Disk, Network Card and GPU.
+
+The operating system sits on top of the hardware.
+
+Examples: Debian, Ubuntu, Fedora, Windows, macOS.
+
+Inside every operating system there is a very special component called the kernel. The kernel is the core of the operating system. It is the first major software component loaded during boot. The kernel acts as a bridge between applications and hardware. Applications cannot directly access RAM, CPU, Disk, Network Interfaces. Instead they ask the kernel. The kernel manages:
+
+* processes
+* memory
+* filesystems
+* networking
+* permissions
+* devices
+
+Without a kernel, applications cannot function.
+
+A process is simply a running program. For example, nginx is a program stored on disk. When Linux executes it, nginx becomes a Running NGINX Process. The same applies to bash, mariadbd, php-fpm, vim, cat, ls, etc. All of these become processes when executed. A process contains:
+
+* executable code
+* memory
+* open files
+* network connections
+* process state
+
+Every running application on Linux is a process.
+
+A virtual machine creates an entire virtual computer.
+
+> Physical Hardware -> Hypervisor -> Virtual Hardware -> Guest Operating System -> Applications/Services
+
+The guest operating system contains:
+
+* its own kernel
+* its own process table
+* its own drivers
+* its own memory management
+
+This makes virtual machines powerful, but also heavier. Each VM must boot an entire operating system.
+
+Many says that a container is a small virtual machine. This is not completely true. A virtual machine boots an entire operating system.
+
+A Docker container works differently. In a container, instead of creating a new operating system, Docker reuses the host kernel.
+
+> Applications -> Containers -> Host Kernel -> Hardware
+
+The important part is: All containers share the same kernel. There is only one kernel: The host kernel.
+
+Suppose the host machine is running Debian. The Debian kernel is already managing CPU, RAM, Filesystems, Networking. When Docker starts a container, the container uses existing host Kernel. Docker does not boot another kernel or another operating system. Docker simply creates an isolated environment around one or more processes. This makes containers extremely lightweight.
+
+If containers share the same kernel, why don't they interfere with each other? Because Docker uses Linux isolation technologies. The most important are Namespaces and Cgroups.
+
+Namespaces isolate:
+
+* processes
+* networking
+* hostnames
+* filesystems
+
+Cgroups limit:
+
+* CPU
+* RAM
+* resource usage
+
+As a result, Container A cannot see Container B, even though both are using the same kernel. To the application running inside the container, it looks like: I have my own filesystem, network and processes.
+
+A container is not really a miniature operating system. A container is, essentially, one or more isolated processes running on the host kernel.
+
+For example:
 
 ```text
-Hardware
-    │
-    ▼
-Hypervisor
-    │
-    ▼
-Guest Operating System
-    │
-    ▼
-Services
+NGINX Container -> NGINX Process
+
+MariaDB Container -> MariaDB Process
+
+WordPress Container -> PHP-FPM Process
 ```
 
-A Docker container works differently. A container shares the host kernel and usually exists to run one main application.
-
-```text
-  Host Linux Kernel
-        │
-        ▼
-  Docker Container
-        │
-        ▼
-   Main Process
-```
+The container exists because these processes exist.
 
 A container is often described as: A process running inside an isolated environment.
 
@@ -1908,6 +1966,10 @@ So before NGINX starts, a configuration must exist. This is the role of init_ngi
 
 Why not create everything inside the Dockerfile? Because the Dockerfile executes during Build Time, while the script executes during Runtime
 
+Before a container exists, there must be an image. An image is not a running system. An image is a template.
+
+For example, Debian, NGINX, OpenSSL, Scripts and Configuration Files, can all be stored inside an image. However, Image ≠ Running Container. The image only contains files. Nothing is executing.
+
 During build time, Dockerfile Executes but:
 
 * WordPress Does Not Exist
@@ -1918,14 +1980,20 @@ During build time, Dockerfile Executes but:
 
 The image is simply being constructed.
 
-Example: docker build. At this moment Docker only creates the image filesystem. However:
+When we execute: docker run nginx-image, Docker:
 
-* DOMAIN_NAME
-* PHP_FPM_HOST
-* PHP_FPM_PORT
-* Docker Secrets
+* Create writable filesystem
+* Create isolated network
+* Create isolated process space
+* Start first process
 
-only become available later when: docker compose up, starts the container.
+However, DOMAIN_NAME, PHP_FPM_HOST, PHP_FPM_PORT and Docker Secrets only become available later when docker compose up, starts the container.
+
+Docker now needs an answer to: What process should I start? This question leads directly to the reason why ENTRYPOINT exists.
+
+Without an ENTRYPOINT, Docker has an image full of files but no instruction telling it what should actually run.
+
+That is why ENTRYPOINT is one of the most important concepts in containerized applications. It defines the first process that will bring the container to life.
 
 ```text
 Build Time = Install Software
@@ -1937,14 +2005,52 @@ Runtime = Configure Software
 
 # Understanding PID 1
 
-Every process running on Linux receives a Process Identifier. Example:
+Every program running on Linux becomes a process. For example, nginx, mariadbd, php-fpm and bash. When Linux executes one of these programs, the kernel creates a process and assigns it a unique identifier. This identifier is called: PID = Process Identifier.
+
+The kernel uses this number to distinguish one process from another. For example:
 
 ```text
-PID 1
-PID 2
-PID 3
-PID 4
+PID 101 -> nginx
+PID 102 -> php-fpm
+PID 103 -> mariadbd
+PID 104 -> bash
 ```
+
+Even if two programs have the same name, their PID will always be different. The kernel uses PIDs to:
+
+* track running processes;
+* allocate memory;
+* send signals;
+* terminate processes;
+* manage process hierarchies.
+
+Without PIDs, Linux would have no reliable way to know which process should receive a signal, access memory, or be terminated.
+
+Processes do not appear randomly. Every process is created by another process. This creates a Process Tree. Every process has a PID, a parent process and potentially child processes.
+
+For example:
+
+```text
+bash
+  │
+  └── nginx
+```
+
+Here, bash is the parent process and nginx is the child process.
+
+Among all process IDs, one process is unique: PID 1. PID 1 is the first process created after the kernel finishes booting.
+
+This process becomes the ancestor of almost every other process on the machine. Every process running on Linux receives a Process Identifier.
+
+PID 1 is responsible for:
+
+* starting services;
+* managing child processes;
+* receiving signals;
+* cleaning zombie processes;
+* maintaining the system lifecycle.
+
+On a normal Linux server: PID 1 is responsible for keeping the operating system running. If PID 1 crashes -> System becomes unstable
 
 A PID is simply a unique number used by the kernel to identify a process.
 
@@ -1952,56 +2058,88 @@ Inside a Docker container there is one very special process: PID 1. This is the 
 
 Docker considers PID 1 to be The Main Container Process.
 
-The entire life of the container depends on this process.
+Docker needs a simple way to determine: Is the container alive? Instead of monitoring every process, Docker monitors only PID 1.
 
-This rule is fundamental to understanding why exec is used later in the script. The goal is to make NGINX become PID 1, because NGINX is the service that should keep the container alive for the rest of its lifetime.
+Imagine, PID 1 = NGINX:
 
-# Why exec Is Important
+> PID 1 Running -> Container Running
 
-The final line of the script should be:
+If NGINX crashes:
 
-```bash
-exec nginx -g "daemon off;"
-```
+> NGINX Exits -> PID 1 Exits -> Docker Detects Exit -> Container Stops
 
-This starts NGINX as the main process of the container.
+From Docker's perspective:
 
-The `exec` command replaces the shell script process with the NGINX process.
+> No Main Process -> Nothing Left To Run
 
-Without `exec`, the process tree could be:
+Docker assumes: If the main application stops, the container has finished its job. This is why the container lifecycle is directly linked to PID 1.
 
-```text
-PID 1 -> init_nginx.sh
-          └── PID 14 -> nginx
-```
-
-With `exec`, the script is replaced:
-
-```text
-PID 1 -> nginx
-```
-
-Docker monitors PID 1.
-
-If PID 1 exits, the container stops.
-
-Therefore, NGINX should become PID 1 because NGINX is the actual service that must keep running.
+The goal is to make NGINX become PID 1, because NGINX is the service that should keep the container alive for the rest of its lifetime.
 
 ---
 
-## Why `daemon off;` Is Needed
+# Why exec Is Important
 
-By default, NGINX usually runs as a daemon.
+The last line of the NGINX initialization script is: ``exec nginx -g "daemon off;"``.
 
-That means it starts and then moves into the background.
+To understand why ``exec`` is needed, we first need to understand what happens when a shell script launches another program.
+
+Many imagine that the shell somehow "turns into" NGINX. That is not what happens. The shell remains alive. Instead, the shell creates a new process. Now two processes exist:
+
+PID 1  -> Shell
+PID 14 -> NGINX
+
+The shell becomes the parent and NGINX becomes the child.
+
+When Docker starts the container:
+
+> Container Starts -> ENTRYPOINT Executes -> init_nginx.sh
+
+PID 1 = init_nginx.sh, because the initialization script is the first process Docker launches. 
+
+Suppose the script executes ``nginx -g "daemon off;"`` without exec: 
+
+PID 1 = init_nginx.sh
+PID 14 = nginx
+
+As Docker is monitoring PID 1, Docker is not monitoring NGINX directly. Docker is monitoring the shell script. The shell script is not the actual service. The real service is NGINX.
+
+The shell script only performs initialization. Its job is to:
+
+* validate environment variables;
+* create certificates;
+* generate configuration files;
+* start NGINX.
+
+After that, the script has nothing else to do. The script should disappear. However, without exec, the script remains as PID 1.
+
+The exec command is a special shell builtin. Unlike normal commands, exec does not create a child process. Instead, it replaces the current process.
+
+Imagine that PID 1 currently belongs to init_nginx.sh. Linux has already allocated memory, process table entry, PID number. When exec nginx -g "daemon off;" runs, Linux does not create PID 14, Instead, PID 1 is reused. The executable associated with that PID changes.
+
+Before: PID 1 -> init_nginx.sh
+
+After: PID 1 -> nginx
+
+This makes the container lifecycle extremely simple. Docker only needs to monitor one process.
+
+---
+
+# What Is A Daemon?
+
+A daemon is a service that runs in the background. Examples: NGINX, MariaDB, SSH and Docker. Traditionally Linux servers run services as daemons. The flow looks like:
+
+> Start Service -> Move To Background -> Keep Running
+
+The user gets the terminal back. The service continues running invisibly.
+
+# What daemon off; Does?
+
+By default, NGINX usually runs as a daemon. That means it starts and then moves into the background.
 
 On a traditional Linux system, that is normal because a service manager such as `systemd` controls it.
 
-Docker containers work differently.
-
-Docker expects the main process to remain in the foreground.
-
-If NGINX daemonizes, the entrypoint script may finish, PID 1 exits, and Docker stops the container.
+Docker containers work differently. Docker expects the main process to remain in the foreground. If NGINX daemonizes, the entrypoint script may finish, PID 1 exits, and Docker stops the container.
 
 The option:
 
@@ -2017,12 +2155,16 @@ So:
 exec nginx -g "daemon off;"
 ```
 
-means:
+means: Replace the script with NGINX and keep NGINX in the foreground. This keeps the container alive.
 
-```text
-Replace the script with NGINX and keep NGINX in the foreground.
-```
+Instead of:
 
-This keeps the container alive.
+> Start -> Background
+
+NGINX becomes:
+
+> Start -> Stay In Foreground
+
+The process remains attached to the terminal and continues occupying PID 1. So, PID 1 = NGINX for the entire lifetime of the container.
 
 ---
