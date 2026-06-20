@@ -51,11 +51,10 @@ wp user list --allow-root
 wp option get siteurl --allow-root
 
 
+docker exec -it wordpress mariadb -h mariadb -P 3307 -u rmedeiro -p wordpress (password -> db_password.txt)
+SHOW VARIABLES LIKE 'port';
 
-
-
-
-
+SELECT user_login FROM wp_users;
 
 
 
