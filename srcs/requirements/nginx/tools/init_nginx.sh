@@ -17,8 +17,8 @@ NGINX_SSL_CERT="$NGINX_SSL_DIR/inception.crt"
 NGINX_SSL_KEY="$NGINX_SSL_DIR/inception.key"
 
 echo "[NGINX] >> Checking required environment variables..."
-if [ -z "$DOMAIN_NAME" ] || [ -z "$PHP_FPM_HOST" ]; then
-	echo "[ERROR] >> DOMAIN_NAME, PHP_FPM_HOST or PHP_FPM_PORT is missing."
+if [ -z "$DOMAIN_NAME" ] || [ -z "$PHP_FPM_HOST" ] || [ -z "$PHP_FPM_PORT" ] || [ -z "$NGINX_PORT" ]; then
+	echo "[ERROR] >> DOMAIN_NAME, PHP_FPM_HOST, PHP_FPM_PORT or NGINX_PORT is missing."
 	exit 1
 fi
 
@@ -42,8 +42,8 @@ echo "[NGINX] >> Creating NGINX configuration file..."
 cat > "$NGINX_CONFIG_FILE" << EOF
 server {
 
-	listen 443 ssl;
-	listen [::]:443 ssl;
+	listen ${NGINX_PORT} ssl;
+	listen [::]:${NGINX_PORT} ssl;
 
 	server_name ${DOMAIN_NAME};
 
@@ -61,7 +61,8 @@ server {
 
 	location ~ \.php$ {
 		include fastcgi_params;
-		fastcgi_pass ${PHP_FPM_HOST}:9000;
+		fastcgi_pass ${PHP_FPM_HOST}:${PHP_FPM_PORT};
+		fastcgi_index index.php;
 		fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
 	}
 

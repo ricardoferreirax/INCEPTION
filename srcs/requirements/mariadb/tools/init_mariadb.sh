@@ -37,9 +37,8 @@ else
 	exit 1
 fi
 
-echo "[MARIADB] >> Checking environment variables..."
-if [ -z "$MDB_DATABASE" ] || [ -z "$MDB_USER" ]; then
-	echo "[ERROR] >> MDB_DATABASE or MDB_USER is missing."
+if [ -z "$MDB_DATABASE" ] || [ -z "$MDB_USER" ] || [ -z "$MDB_PORT" ]; then
+	echo "[ERROR] >> MDB_DATABASE, MDB_USER or MDB_PORT is missing."
 	exit 1
 fi
 
@@ -58,7 +57,7 @@ echo "[MARIADB] >> Creating MariaDB configuration file..."
 cat > "$MARIADB_CONFIG_FILE" << EOF
 [mysqld]
 bind-address=0.0.0.0
-port=3306
+port=${MDB_PORT}
 datadir=${MARIADB_DATA_DIR}
 socket=${MARIADB_SOCKET}
 EOF

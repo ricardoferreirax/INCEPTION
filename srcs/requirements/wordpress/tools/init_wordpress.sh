@@ -44,11 +44,10 @@ else
 	exit 1
 fi
 
-echo "[WORDPRESS] >> Checking required environment variables..."
-if [ -z "$MDB_HOST" ] || [ -z "$MDB_DATABASE" ] || [ -z "$MDB_USER" ] || \
+if [ -z "$MDB_HOST" ] || [ -z "$MDB_PORT" ] || [ -z "$MDB_DATABASE" ] || [ -z "$MDB_USER" ] || \
 	[ -z "$WP_URL" ] || [ -z "$WP_TITLE" ] || [ -z "$WP_ADMIN_USER" ] || \
 	[ -z "$WP_ADMIN_EMAIL" ] || [ -z "$WP_USER" ] || [ -z "$WP_USER_EMAIL" ] || \
-	[ -z "$WP_USER_ROLE" ];
+	[ -z "$WP_USER_ROLE" ] || [ -z "$PHP_FPM_PORT" ];
 then
 	echo "[ERROR] >> Required environment variables are missing."
 	exit 1
@@ -71,7 +70,7 @@ cat > "$PHP_FPM_CONFIG_FILE" << EOF
 [www]
 user = www-data
 group = www-data
-listen = 0.0.0.0:9000
+listen = 0.0.0.0:${PHP_FPM_PORT}
 listen.owner = www-data
 listen.group = www-data
 pm = dynamic
@@ -88,7 +87,7 @@ cd "$WORDPRESS_DIR"
 # Attempts to connect to the MariaDB server in a loop until it is ready to accept connections. 
 # This ensures that the database is available before proceeding with WordPress installation.
 echo "[WORDPRESS] >> Waiting for MariaDB..."
-until mariadb -h "$MDB_HOST" -u "$MDB_USER" -p"$DB_PASSWORD" "$MDB_DATABASE" -e "SELECT 1" >/dev/null 2>&1
+until mariadb -h "$MDB_HOST" -P "$MDB_PORT" -u "$MDB_USER" -p"$DB_PASSWORD" "$MDB_DATABASE" -e "SELECT 1" >/dev/null 2>&1
 do
 	echo "[WORDPRESS] >> MariaDB is not ready yet..."
 	sleep 2
@@ -102,7 +101,7 @@ else
 
 	echo "[WORDPRESS] >> Creating wp-config.php..."
 	wp config create \
-		--dbname="$MDB_DATABASE" --dbuser="$MDB_USER" --dbpass="$DB_PASSWORD" --dbhost="$MDB_HOST" --allow-root
+		--dbname="$MDB_DATABASE" --dbuser="$MDB_USER" --dbpass="$DB_PASSWORD" --dbhost="${MDB_HOST}:${MDB_PORT}" --allow-root
 
 	echo "[WORDPRESS] >> Installing WordPress site..."
 	wp core install --url="$WP_URL" --title="$WP_TITLE" --admin_user="$WP_ADMIN_USER" --admin_password="$WP_ADMIN_PASSWORD" \
