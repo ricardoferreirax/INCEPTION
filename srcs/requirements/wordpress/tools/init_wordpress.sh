@@ -4,7 +4,6 @@ set -e
 
 WORDPRESS_DIR="/var/www/html"
 WP_CONFIG_FILE="$WORDPRESS_DIR/wp-config.php"
-
 PHP_FPM_RUN_DIR="/run/php"
 PHP_FPM_CONFIG_DIR="/etc/php/8.2/fpm/pool.d"
 PHP_FPM_CONFIG_FILE="$PHP_FPM_CONFIG_DIR/www.conf"
@@ -32,7 +31,7 @@ else
 fi
 
 echo "[WORDPRESS] >> Checking required environment variables..."
-if [ -z "$DOMAIN_NAME" ] || [ -z "$NGINX_PORT" ] || \
+if [ -z "$DOMAIN_NAME" ] || \
 	[ -z "$MDB_HOST" ] || [ -z "$MDB_PORT" ] || \
 	[ -z "$MDB_DATABASE" ] || [ -z "$MDB_USER" ] || \
 	[ -z "$WP_TITLE" ] || [ -z "$WP_ADMIN_USER" ] || \
@@ -44,17 +43,12 @@ then
 	exit 1
 fi
 
-if ! [[ "$MDB_PORT" =~ ^[0-9]+$ ]] || ! [[ "$PHP_FPM_PORT" =~ ^[0-9]+$ ]] || ! [[ "$NGINX_PORT" =~ ^[0-9]+$ ]];
-then
-	echo "[ERROR] >> MDB_PORT, PHP_FPM_PORT and NGINX_PORT must be numbers."
+if ! [[ "$MDB_PORT" =~ ^[0-9]+$ ]] || ! [[ "$PHP_FPM_PORT" =~ ^[0-9]+$ ]]; then
+	echo "[ERROR] >> MDB_PORT and PHP_FPM_PORT must be numbers."
 	exit 1
 fi
 
-if [ "$NGINX_PORT" = "443" ]; then
-	WP_FULL_URL="https://${DOMAIN_NAME}"
-else
-	WP_FULL_URL="https://${DOMAIN_NAME}:${NGINX_PORT}"
-fi
+WP_FULL_URL="https://${DOMAIN_NAME}"
 
 mkdir -p "$WORDPRESS_DIR"
 mkdir -p "$PHP_FPM_RUN_DIR"
@@ -92,10 +86,6 @@ if [ -f "$WP_CONFIG_FILE" ]; then
 
 	echo "[WORDPRESS] >> Updating database host configuration..."
 	wp config set DB_HOST "${MDB_HOST}:${MDB_PORT}" --allow-root
-
-	echo "[WORDPRESS] >> Updating WordPress site URL..."
-	wp option update siteurl "$WP_FULL_URL" --allow-root
-	wp option update home "$WP_FULL_URL" --allow-root
 else
 	echo "[WORDPRESS] >> Downloading WordPress core files..."
 	wp core download --allow-root

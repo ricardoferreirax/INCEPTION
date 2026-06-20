@@ -51,7 +51,7 @@ services:
     networks:
       - inception
     ports:
-      - "${NGINX_PORT}:${NGINX_PORT}"
+      - "443:443"
     env_file:
       - .env
     depends_on:
