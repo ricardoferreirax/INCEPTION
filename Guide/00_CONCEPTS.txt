@@ -56,10 +56,11 @@ SHOW VARIABLES LIKE 'port';
 
 SELECT user_login FROM wp_users;
 
-
-
-
-
+Confirma com: docker exec -it wordpress ss -lntp
+Se não tiveres ss, instala ou usa:
+docker exec -it wordpress bash
+apt update && apt install -y iproute2
+ss -lntp
 
 
 

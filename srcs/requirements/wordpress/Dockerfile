@@ -12,6 +12,4 @@ COPY ./tools/init_wordpress.sh /usr/local/bin/init_wordpress.sh
 
 RUN chmod +x /usr/local/bin/init_wordpress.sh
 
-EXPOSE 9000
-
 ENTRYPOINT ["init_wordpress.sh"]
