@@ -6,6 +6,4 @@ COPY ./tools/init_nginx.sh /usr/local/bin/init_nginx.sh
 
 RUN chmod +x /usr/local/bin/init_nginx.sh
 
-EXPOSE 443
-
 ENTRYPOINT ["init_nginx.sh"]
