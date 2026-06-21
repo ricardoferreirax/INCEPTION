@@ -60,7 +60,7 @@ services:
 
   ftp:
     build:
-      context: ./requirements/ftp
+      context: ./requirements/bonus/ftp
       dockerfile: Dockerfile
     container_name: ftp
     image: ftp
@@ -109,3 +109,5 @@ secrets:
     file: ../secrets/wp_admin_password.txt
   wp_user_password:
     file: ../secrets/wp_user_password.txt
+  ftp_password:
+    file: ../secrets/ftp_password.txt

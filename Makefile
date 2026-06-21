@@ -6,7 +6,7 @@
 #    By: rmedeiro <rmedeiro@student.42lisboa.com    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/06/05 22:53:35 by rmedeiro          #+#    #+#              #
-#    Updated: 2026/06/20 19:58:42 by rmedeiro         ###   ########.fr        #
+#    Updated: 2026/06/21 23:10:01 by rmedeiro         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -35,6 +35,11 @@ db:
 	mkdir -p $(MDB_DIR)
 	mkdir -p $(WP_DIR)
 	$(COMPOSE) up -d --build mariadb
+
+ftp:
+	mkdir -p $(MDB_DIR)
+	mkdir -p $(WP_DIR)
+	$(COMPOSE) up -d --build ftp
 
 down:
 	$(COMPOSE) down
