@@ -23,21 +23,25 @@ fi
 mkdir -p "$FTP_ROOT_DIR"
 mkdir -p /var/run/vsftpd/empty
 
-echo "[FTP] >> Preparing FTP user..."
+echo "[FTP] >> Preparing www-data group..."
 if ! getent group www-data >/dev/null 2>&1; then
 	groupadd -g 33 www-data
 fi
 
+echo "[FTP] >> Creating FTP user..."
 if ! id "$FTP_USER" >/dev/null 2>&1; then
-	useradd -u 33 -g www-data -d "$FTP_ROOT_DIR" -s /bin/bash "$FTP_USER"
+	useradd -m -d "$FTP_ROOT_DIR" -s /bin/bash "$FTP_USER"
 fi
+
+echo "[FTP] >> Adding FTP user to www-data group..."
+usermod -aG www-data "$FTP_USER"
 
 echo "[FTP] >> Setting FTP user password..."
 echo "$FTP_USER:$FTP_PASSWORD" | chpasswd
 
-echo "[FTP] >> Updating FTP root ownership..."
+echo "[FTP] >> Updating FTP root ownership and permissions..."
 chown -R www-data:www-data "$FTP_ROOT_DIR"
-chmod -R 755 "$FTP_ROOT_DIR"
+chmod -R 775 "$FTP_ROOT_DIR"
 
 echo "[FTP] >> Creating vsftpd configuration file..."
 cat > "$FTP_CONFIG_FILE" << EOF
@@ -46,7 +50,7 @@ listen_ipv6=NO
 anonymous_enable=NO
 local_enable=YES
 write_enable=YES
-local_umask=022
+local_umask=002
 chroot_local_user=YES
 allow_writeable_chroot=YES
 local_root=${FTP_ROOT_DIR}
