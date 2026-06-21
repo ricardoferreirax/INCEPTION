@@ -58,6 +58,24 @@ services:
       - wordpress
     restart: always
 
+  ftp:
+    build:
+      context: ./requirements/ftp
+      dockerfile: Dockerfile
+    container_name: ftp
+    image: ftp
+    volumes:
+      - wordpress:/var/www/html
+    networks:
+      - inception
+    ports:
+      - "21:21"
+    env_file:
+      - .env
+    secrets:
+      - ftp_password
+    restart: always
+
 networks:
   inception:
     driver: bridge
