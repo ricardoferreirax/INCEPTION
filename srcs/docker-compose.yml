@@ -70,10 +70,13 @@ services:
       - inception
     ports:
       - "21:21"
+      - "40000-40005:40000-40005"
     env_file:
       - .env
     secrets:
       - ftp_password
+    depends_on:
+      - wordpress
     restart: always
 
 networks:
