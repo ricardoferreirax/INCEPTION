@@ -43,6 +43,163 @@
 # The number of child processes created on startup. Used only when pm is set to 'dynamic'
 
 
+FTP Dockerfile
+
+Introduction
+
+What Is FTP?
+
+Why FTP Exists
+
+Why FTP Is A Bonus In Inception
+
+How FTP Fits Into The Architecture
+
+FTP Request Flow
+
+Active Mode vs Passive Mode
+
+Why Passive Mode Is Required In Docker
+
+The FTP Dockerfile
+
+FROM debian:bookworm
+
+Installing vsftpd
+
+COPY init_ftp.sh
+
+chmod +x
+
+EXPOSE
+
+ENTRYPOINT
+
+What Is vsftpd?
+
+Why vsftpd?
+
+What Is An FTP User?
+
+Why Create A Dedicated FTP User?
+
+Linux Users And Permissions
+
+Users, Groups And Ownership
+
+Why ftpuser Is Added To www-data
+
+Understanding chmod 775
+
+Understanding chgrp
+
+Understanding Docker Volumes
+
+How FTP And WordPress Share The Same Volume
+
+Why FTP Must Not Have Its Own Files
+
+How File Uploads Become Visible In WordPress
+
+FTP Configuration File
+
+Detailed Explanation Of Every Directive
+
+listen
+
+listen_ipv6
+
+anonymous_enable
+
+local_enable
+
+write_enable
+
+local_umask
+
+chroot_local_user
+
+allow_writeable_chroot
+
+local_root
+
+pasv_enable
+
+pasv_min_port
+
+pasv_max_port
+
+userlist_enable
+
+userlist_file
+
+userlist_deny
+
+Starting vsftpd
+
+Why exec Is Important
+
+PID 1
+
+Foreground Process
+
+How To Test FTP
+
+Using Linux ftp
+
+Using FileZilla
+
+Testing Uploads
+
+Testing Downloads
+
+Verifying Shared Volume
+
+Live Coding Examples
+
+Changing FTP User
+
+Changing FTP Port
+
+Changing Passive Ports
+
+How To Demonstrate The Bonus During Evaluation
+
+Common Errors
+
+530 Login Incorrect
+
+553 Could Not Create File
+
+500 OOPS Invalid pasv_address
+
+425 Failed To Establish Connection
+
+Permission Denied
+
+Conclusion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 docker exec -it wordpress sh
 cd /var/www/html
