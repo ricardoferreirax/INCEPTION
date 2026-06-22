@@ -113,3 +113,183 @@ Within Inception, the same principle applies. Instead of uploading files to a tr
 Because both containers use the same persistent storage, any file uploaded through FTP immediately becomes available to WordPress. This makes FTP a convenient way to manage website content while also demonstrating how Docker volumes can be shared safely between multiple services.
 
 ---
+
+# FTP Request Flow
+
+To understand how FTP works, it is important to understand what happens from the moment a user connects to an FTP server until a file is transferred.
+
+Unlike protocols such as HTTP, FTP uses two different connections. One connection is responsible for exchanging commands and responses, while the other is responsible for transferring the actual file data.
+
+The communication process typically follows these steps:
+
+```text
+ FTP Client
+     │
+     │ Connects to port 21
+     ▼
+ FTP Server
+```
+
+The first connection is called the control connection. This connection is established on port 21 and remains open during the entire FTP session. It is used to exchange commands such as USER, PASS, PWD, GET, PUT, QUIT, etc.
+
+For example, when a user logs in:
+
+```text
+Client -> USER ftpuser
+Server -> 331 Password required
+
+Client -> PASS ********
+Server -> 230 Login successful
+```
+
+Once authentication succeeds, the client can navigate directories and request file operations. However, the actual file contents are not transferred through this control connection.
+
+Instead, FTP creates a second connection called the data connection.
+
+For example, when the user executes: ``put test.txt``, the following happens:
+
+1. Control connection already exists:
+
+> Client -> Port 21
+
+2. Data connection created:
+
+> Client -> FTP Server
+
+3. File transferred:
+
+> test.txt
+
+The control connection remains open while the data connection is created and destroyed whenever files or directory listings need to be transferred.
+
+This separation between commands and file data is one of the characteristics that makes FTP different from protocols such as HTTP.
+
+---
+
+# Active Mode vs Passive Mode
+
+One of the most important concepts in FTP is the difference between Active Mode and Passive Mode.
+
+Both modes achieve the same goal: creating the data connection required for file transfers.
+
+The difference lies in who initiates that second connection.
+
+---
+
+## Active Mode
+
+In Active Mode, the client first establishes the control connection:
+
+> Client -> Server:21
+
+The client then tells the server: ``Connect back to me on this port``.
+
+The server initiates the data connection:
+
+```text
+           Control Connection
+Client ----------------------> Server:21
+
+           Data Connection
+Client <---------------------- Server:20
+```
+
+Notice something important: The server is now trying to connect back to the client. This worked well in the early days of networking, but modern environments often contain:
+
+* Firewalls
+* NAT routers
+* Docker networks
+* Cloud infrastructures
+
+These systems frequently block incoming connections. As a result, Active Mode often fails.
+
+---
+
+## Passive Mode
+
+Passive Mode solves this problem by reversing the process. The client still creates the control connection:
+
+> Client -> Server:21
+
+However, when data transfer is required, the server says: ``I am listening on another port. You connect to me there``.
+
+The client then initiates the second connection as well.
+
+```text
+         Control Connection
+Client ----------------------> Server:21
+
+           Data Connection
+Client ----------------------> Server:40000
+```
+
+Now the client initiates both connections. This is much more compatible with modern networks because outgoing connections are usually allowed.
+
+---
+
+# Why Passive Mode Is Required In Docker
+
+When FTP runs inside a Docker container, Passive Mode becomes almost mandatory.
+
+A container does not have direct access to the host network. Instead, Docker creates an isolated network environment.
+
+```text
+  Host
+    │
+    ▼
+Docker Network
+    │
+    ▼
+FTP Container
+```
+
+The FTP container only exposes specific ports that Docker is instructed to forward. For example:
+
+```text
+ports:
+  - "21:21"
+  - "40000-40005:40000-40005"
+```
+
+If Active Mode were used, the FTP server inside the container would attempt to create a connection back to the client.
+
+> FTP Container -> Client
+
+This connection often fails because:
+
+* Docker is behind NAT.
+* The client may be behind another NAT.
+* Firewalls usually block incoming connections.
+* Docker only exposes explicitly mapped ports.
+
+As a result, commands such as ls, dir, put and get, may fail even though login succeeds.
+
+Passive Mode avoids these problems because the client always initiates the data connection.
+
+The workflow becomes:
+
+```text
+Client
+   │
+   ├─────> FTP Server:21
+   │
+   └─────> FTP Server:40000
+```
+
+Since both connections originate from the client, Docker can correctly route them through the published ports. This is why the configuration contains:
+
+```text
+pasv_enable=YES
+pasv_min_port=40000
+pasv_max_port=40005
+```
+
+These settings tell vsftpd: ``Whenever a data connection is required, use a port between 40000 and 40005``. Docker can then safely expose exactly those ports:
+
+```text
+ports:
+  - "21:21"
+  - "40000-40005:40000-40005"
+```
+
+---

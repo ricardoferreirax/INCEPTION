@@ -45,16 +45,6 @@
 
 FTP Dockerfile
 
-Introduction
-
-What Is FTP?
-
-Why FTP Exists
-
-Why FTP Is A Bonus In Inception
-
-How FTP Fits Into The Architecture
-
 FTP Request Flow
 
 Active Mode vs Passive Mode
