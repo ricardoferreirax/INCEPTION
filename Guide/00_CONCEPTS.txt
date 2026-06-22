@@ -45,25 +45,11 @@
 
 FTP Dockerfile
 
-FTP Request Flow
-
-Active Mode vs Passive Mode
-
-Why Passive Mode Is Required In Docker
-
 The FTP Dockerfile
 
 FROM debian:bookworm
 
 Installing vsftpd
-
-COPY init_ftp.sh
-
-chmod +x
-
-EXPOSE
-
-ENTRYPOINT
 
 What Is vsftpd?
 
@@ -126,6 +112,14 @@ userlist_file
 userlist_deny
 
 Starting vsftpd
+
+COPY init_ftp.sh
+
+chmod +x
+
+EXPOSE
+
+ENTRYPOINT
 
 Why exec Is Important
 

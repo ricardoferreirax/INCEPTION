@@ -293,3 +293,192 @@ ports:
 ```
 
 ---
+
+# FTP Dockerfile
+
+The FTP Dockerfile is responsible for building the image used by the FTP service.
+
+Just like the other services in Inception, the FTP container must be built manually from a Debian or Alpine base image. We should not use a ready-made FTP image because the purpose of the project is to understand how each service is installed, configured, and started.
+
+A simple FTP Dockerfile can look like this:
+
+```Dockerfile
+FROM debian:bookworm
+
+RUN apt-get update && apt-get install -y vsftpd && rm -rf /var/lib/apt/lists/*
+
+COPY ./tools/init_ftp.sh /usr/local/bin/init_ftp.sh
+
+RUN chmod +x /usr/local/bin/init_ftp.sh
+
+ENTRYPOINT ["init_ftp.sh"]
+```
+
+This Dockerfile does not fully configure FTP by itself. Its job is mainly to install the required software and copy the initialization script into the image. The real configuration happens when the container starts, inside ``init_ftp.sh``.
+
+This follows the same logic used by the other containers:
+
+```text
+Dockerfile
+    installs the service and copies the script
+
+init_ftp.sh
+    checks variables and secrets
+    creates users and permissions
+    generates the configuration file
+    starts the service in the foreground
+```
+
+This separation is important because some values, such as the FTP username, FTP password, passive ports, and mounted volume, only exist at runtime when Docker Compose starts the container.
+
+---
+
+# FROM debian:bookworm
+
+This instruction defines the base image used to build the FTP container.
+
+Instead of starting from a prebuilt FTP image, the container starts from a clean Debian Bookworm system. Debian provides the basic Linux environment required to install and run the FTP server. This includes:
+
+* the filesystem layout;
+* the apt package manager;
+* Linux users and groups;
+* permissions;
+* basic runtime libraries;
+* networking support.
+
+Every instruction after FROM is added on top of this Debian base. The final image becomes:
+
+```text
+Debian Bookworm
+      │
+      ├── vsftpd package
+      ├── init_ftp.sh
+      └── generated FTP configuration at runtime
+```
+
+Using Debian directly is important for Inception because the subject requires us to build our own images. If we used a ready-made FTP image, most of the service would already be configured for us. That would go against the spirit of the project.
+
+By using ``FROM debian:bookworm`` we explicitly install and configure FTP ourselves.
+
+---
+
+# Installing vsftpd
+
+```Dockerfile
+RUN apt-get update && apt-get install -y vsftpd && rm -rf /var/lib/apt/lists/*
+```
+
+This instruction installs the FTP server package.
+
+Before this line runs, the image is only a minimal Debian system. It does not contain an FTP server yet.
+
+After this instruction, the container has the FTP server binary installed and can later start it with: ``vsftpd /etc/vsftpd.conf``.
+
+---
+
+# What Is vsftpd?
+
+vsftpd means: ``Very Secure FTP Daemon``.
+
+It is an FTP server implementation for Unix-like systems.
+
+A daemon is a service that runs in the background and waits for requests. In this case, vsftpd waits for FTP clients to connect on port 21.
+
+When a client such as FileZilla connects, vsftpd handles:
+
+* accepting the connection;
+* asking for username and password;
+* authenticating the user;
+* applying FTP configuration rules;
+* listing directories;
+* receiving uploaded files;
+* sending downloaded files;
+* closing the connection safely.
+
+In Inception project, vsftpd is the program that makes the FTP container useful. The container itself is only an isolated environment. Debian provides the base system. Docker provides the isolation and networking. But vsftpd is the actual service that speaks the FTP protocol.
+
+The flow is:
+
+```text
+FileZilla
+    │
+    │ FTP protocol
+    ▼
+  vsftpd
+    │
+    ▼
+/var/www/html
+```
+
+So when we upload test.txt, FileZilla sends FTP commands to vsftpd, and vsftpd writes the file into the mounted WordPress volume.
+
+--- 
+
+# What Is An FTP User?
+
+An FTP user is the account used to authenticate into the FTP server. When we connect with FileZilla, we provide:
+
+```text
+Host: rickymercury.42.fr
+User: ftpuser
+Password: ********
+Port: 21
+```
+
+So when we create: ``useradd -m -d /var/www/html -s /bin/bash ftpuser``, we are creating a Linux user called: ``ftpuser``.
+
+Then this line: ``echo "$FTP_USER:$FTP_PASSWORD" | chpasswd``, sets the password for that user.
+
+When FileZilla sends the username and password, vsftpd checks whether that Linux user exists and whether the password is correct.
+
+If authentication succeeds, the FTP session starts.
+
+The FTP user also matters for permissions. When a file is uploaded, it is created by that user. Therefore, the user must have write permission in the target directory.
+
+In project, the target directory is: ``/var/www/html``, which is the WordPress shared volume.
+
+Creating a FTP user is better than using root or reusing an unrelated system account.
+
+The FTP user should only have access to the files it needs to manage. In this project, that means the WordPress files inside: /var/www/html. It should not have unnecessary access to the whole container filesystem.
+
+A dedicated user makes the system easier to understand:
+
+```text
+www-data
+    used by WordPress/PHP-FPM to read and write website files
+
+ftpuser
+    used by FTP clients to upload and manage website files
+```
+
+This separation is cleaner than using one account for everything. However, because both users need access to the same files, permissions must be configured correctly. That is why the FTP user is added to the www-data group: ``usermod -aG www-data "$FTP_USER"`` and the WordPress directory is configured like this:
+
+```text
+chown -R www-data:www-data /var/www/html
+chmod -R 775 /var/www/html
+```
+
+This means:
+
+```text
+Owner: www-data
+Group: www-data
+Permissions: rwxrwxr-x
+
+So:
+
+www-data can write because it is the owner.
+ftpuser can write because it belongs to the www-data group.
+Others can read and enter directories, but cannot write.
+
+```
+This is the clean permission model for the FTP bonus:
+
+* WordPress writes as www-data.
+* FTP writes as ftpuser.
+* Both share the www-data group.
+* The shared volume remains usable by both services.
+
+It avoids the earlier problem where ftpuser could log in but could not upload files because /var/www/html belonged to www-data with permissions 755. After adding ftpuser to the correct group and using 775, uploads work correctly.
+
+---
