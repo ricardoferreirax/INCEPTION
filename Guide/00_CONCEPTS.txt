@@ -63,6 +63,61 @@ apt update && apt install -y iproute2
 ss -lntp
 
 
+1. Instalar FileZilla: sudo apt install filezilla -y
+2. Abrir no terminal: filezilla
+3. Configurar ligação no FileZilla:
+
+Host: rickymercury.42.fr
+Username: ftpuser
+Password: password do secrets/ftp_password.txt
+Port: 21
+
+Clica em: Quickconnect
+Se pedir confirmação, aceita.
+
+4. O que deves ver
+
+Painel esquerdo -> Ficheiros do teu Debian.
+Por exemplo: test.txt
+			 bonus.html
+
+Painel direito -> Ficheiros do WordPress -> Conteúdo de /var/www/html do container FTP.
+
+Normalmente: index.php
+			 wp-admin
+			 wp-content
+			 wp-includes
+			 wp-config.php
+
+Isso prova que o FTP está apontado para o volume do WordPress.
+
+
+5. Criar ficheiro para teste
+
+No terminal: echo "<h1>FTP BONUS WORKS</h1>" > bonus.html
+
+6. Fazer upload no FileZilla
+
+No painel da esquerda, procura o ficheiro: bonus.html
+
+Arrasta para o painel da direita.
+
+Deve aparecer em baixo: Successful transfers
+
+7. Confirmar no host: ls -l /home/rickymercury/data/wordpress/bonus.html
+
+8. Confirmar no container WordPress: docker exec -it wordpress ls -l /var/www/html/bonus.html
+
+9. Mostrar no browser
+
+Abre: https://rickymercury.42.fr/bonus.html
+
+Deve aparecer: FTP BONUS WORKS
+
+
+
+
+
 
 
 Docker
