@@ -396,6 +396,7 @@ Docker
 
 7) Building an Image
 
+
    When Docker reads a Dockerfile: docker build .
 
    Docker performs:      Read Dockerfile
