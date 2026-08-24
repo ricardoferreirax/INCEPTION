@@ -42,7 +42,6 @@
 #
 # The number of child processes created on startup. Used only when pm is set to 'dynamic'
 
-
 FTP Dockerfile
 
 The FTP Dockerfile
