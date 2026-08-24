@@ -363,6 +363,7 @@ Docker
 
 5) What Is a Docker Container?
 
+
    Docker Container is a lightweight, standalone, and executable software package that encapsulates an 
    application and its dependencies, ensuring consistent and reliable execution across different computing 
    environments. It provides a standardized approach to package and deploy applications, allowing them to 
