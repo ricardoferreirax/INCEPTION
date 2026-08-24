@@ -264,6 +264,7 @@ Docker
 
 1) What Problem Does Docker Solve? 
 
+
    Imagine that we create a web application on our computer. To run correctly, our application may require:
 
 	* a specific Linux distribution
