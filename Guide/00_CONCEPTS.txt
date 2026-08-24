@@ -305,7 +305,8 @@ Docker
    Each container has its own responsibility. Because containers are isolated, they do not interfere with the rest of the system.
 
    Docker is not only one command. It is a complete system composed of several parts.
-   
+
+
    The most important parts are: Docker Client
 								 Docker Daemon
 								 Docker Images
