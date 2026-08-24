@@ -1,10 +1,12 @@
 services:
+
   mariadb:
     build:
       context: ./requirements/mariadb
       dockerfile: Dockerfile
-    container_name: mariadb
     image: mariadb
+    pull_policy: never
+    container_name: mariadb
     volumes:
       - mariadb:/var/lib/mysql
     networks:
@@ -16,14 +18,15 @@ services:
     secrets:
       - db_root_password
       - db_password
-    restart: always
+    restart: on-failure
 
   wordpress:
     build:
       context: ./requirements/wordpress
       dockerfile: Dockerfile
-    container_name: wordpress
     image: wordpress
+    pull_policy: never
+    container_name: wordpress
     volumes:
       - wordpress:/var/www/html
     networks:
@@ -38,14 +41,15 @@ services:
       - wp_user_password
     depends_on:
       - mariadb
-    restart: always
+    restart: on-failure
 
   nginx:
     build:
       context: ./requirements/nginx
       dockerfile: Dockerfile
-    container_name: nginx
     image: nginx
+    pull_policy: never
+    container_name: nginx
     volumes:
       - wordpress:/var/www/html
     networks:
@@ -56,34 +60,38 @@ services:
       - .env
     depends_on:
       - wordpress
-    restart: always
+    restart: on-failure
 
   ftp:
     build:
       context: ./requirements/bonus/ftp
       dockerfile: Dockerfile
-    container_name: ftp
     image: ftp
+    pull_policy: never
+    container_name: ftp
     volumes:
       - wordpress:/var/www/html
     networks:
       - inception
     ports:
       - "21:21"
-      - "40000-40005:40000-40005"
+      - "${FTP_PASV_MIN_PORT}-${FTP_PASV_MAX_PORT}:${FTP_PASV_MIN_PORT}-${FTP_PASV_MAX_PORT}"
     env_file:
       - .env
     secrets:
       - ftp_password
     depends_on:
       - wordpress
-    restart: always
+    restart: on-failure
 
 networks:
+
   inception:
     driver: bridge
 
+
 volumes:
+
   mariadb:
     name: mariadb
     driver: local
@@ -100,7 +108,9 @@ volumes:
       o: bind
       device: ${DATA_PATH}/wordpress
 
+
 secrets:
+
   db_root_password:
     file: ../secrets/db_root_password.txt
   db_password:
