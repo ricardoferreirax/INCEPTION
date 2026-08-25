@@ -318,6 +318,7 @@ Docker
 								 Docker Networks
 								 Docker Compose
 
+
     Together, these components allow us to build and run complete infrastructures. When we type: docker run nginx , we are not 
 	simply opening a program. We are asking Docker to create a container from an image and start a process inside that isolated environment.
 
@@ -345,6 +346,7 @@ Docker
 																								Execution
 
    The daemon is usually called: dockerd
+
    When the Docker service is running on Linux, the daemon is active in the background.
    Example: sudo systemctl status docker
    If the daemon is stopped, Docker commands will fail because the client has nobody to talk to.
