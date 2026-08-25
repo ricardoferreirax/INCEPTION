@@ -6,6 +6,7 @@ Before modern services such as Google Drive, Dropbox, OneDrive, or Git repositor
 
 In the Inception project, FTP is implemented as a bonus service. Its role is not to serve web pages or execute PHP code, but simply to provide a controlled method for accessing and modifying the WordPress files stored inside a shared Docker volume.
 
+
 Consider the Inception project. We have a WordPress website running inside Docker. The website files are stored inside: /var/www/html. Without FTP, modifying those files usually requires: docker exec -it wordpress bash.
 
 The FTP container works alongside the existing infrastructure and shares the same WordPress files as the WordPress container. This means that files uploaded through FTP become immediately available to the website without requiring any manual copying between containers.
