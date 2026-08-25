@@ -145,6 +145,7 @@ Server -> 230 Login successful
 
 Once authentication succeeds, the client can navigate directories and request file operations. However, the actual file contents are not transferred through this control connection.
 
+
 Instead, FTP creates a second connection called the data connection.
 
 For example, when the user executes: ``put test.txt``, the following happens:
