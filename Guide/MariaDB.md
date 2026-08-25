@@ -27,6 +27,7 @@ This Dockerfile builds the custom MariaDB image used by the MariaDB service in t
 
 To fully understand what this Dockerfile does, it is important to first understand what problem MariaDB solves and why a database server is required in a modern web application.
 
+
 WordPress is not a collection of static HTML pages. Instead, it is a dynamic application. Every time a visitor opens the website, WordPress generates the page dynamically by retrieving information stored inside a database.
 
 For example, when a user visits ``https://login.42.fr`` WordPress may need to retrieve:
