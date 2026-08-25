@@ -294,6 +294,7 @@ Docker
 
 
    This means the application does not depend heavily on what is installed on the host machine. The host only needs Docker.
+
    For example, imagine a WordPress project. WordPress needs PHP, PHP-FPM, configuration files, permissions, and a connection 
    to a database. Without Docker, we would install and configure everything directly on the system. With Docker, WordPress can 
    run inside its own container, MariaDB can run inside another container, and NGINX can run inside another container.
