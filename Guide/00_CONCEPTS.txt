@@ -419,6 +419,7 @@ Docker
 9) Docker Daemon (Dockerd)
 
    The Docker daemon is the engine behind Docker. Is the core component of DOcker platform. It is responsible
+
    for building, running, and managing Docker containers. It is always running in the background.
    Whenever we execute: docker build / docker run / docker ps, we are actually talking to the Docker daemon.
    The daemon performs all the real work.
