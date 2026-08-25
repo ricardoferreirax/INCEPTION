@@ -231,6 +231,7 @@ Now the client initiates both connections. This is much more compatible with mod
 
 # Why Passive Mode Is Required In Docker
 
+
 When FTP runs inside a Docker container, Passive Mode becomes almost mandatory.
 
 A container does not have direct access to the host network. Instead, Docker creates an isolated network environment.
