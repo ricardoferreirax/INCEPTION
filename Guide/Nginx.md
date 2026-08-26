@@ -377,6 +377,7 @@ The flow becomes:
 
 > Browser asks for a dynamic WordPress page  -> NGINX receives the request  -> NGINX forwards it to PHP-FPM  -> PHP-FPM executes WordPress PHP code  -> WordPress queries MariaDB if needed  -> HTML is generated  -> NGINX sends the generated HTML to the browser
 
+
 NGINX receives the browser request, but PHP-FPM executes the PHP code.
 
 The connection between NGINX and WordPress works like this:
