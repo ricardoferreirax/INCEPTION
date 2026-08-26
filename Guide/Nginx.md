@@ -671,6 +671,7 @@ Using ``FROM nginx`` would already provide:
 
 That would make the project easier, but it would hide important learning. By using Debian and installing NGINX manually, we learn:
 
+
 * how NGINX is installed;
 * which packages are required;
 * where NGINX configuration files are stored;
