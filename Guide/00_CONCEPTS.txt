@@ -415,6 +415,7 @@ Docker
 
    Once the image exists:  docker run myimage
 
+
    Docker creates a container from that image. The container then starts executing its main process.
 
 9) Docker Daemon (Dockerd)
