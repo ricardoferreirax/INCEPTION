@@ -1973,6 +1973,7 @@ So before NGINX starts, a configuration must exist. This is the role of init_ngi
 
 Why not create everything inside the Dockerfile? Because the Dockerfile executes during Build Time, while the script executes during Runtime
 
+
 Before a container exists, there must be an image. An image is not a running system. An image is a template.
 
 For example, Debian, NGINX, OpenSSL, Scripts and Configuration Files, can all be stored inside an image. However, Image ≠ Running Container. The image only contains files. Nothing is executing.
