@@ -26,6 +26,7 @@ NGINX is the public entry point of the whole infrastructure. This means that it 
 
 For example, when the user opens ``https://rmedeiro.42.fr``, the browser does not connect directly to WordPress. The browser also does not connect directly to MariaDB. The browser connects to NGINX. This is important because, in the Inception architecture, only one service should be publicly exposed to the host machine: that service is NGINX.
 
+
 WordPress and MariaDB are internal services. They communicate through the Docker network, but they should not be directly accessible from outside. NGINX is responsible for:
 
 * receiving HTTPS requests from the browser;
@@ -124,7 +125,8 @@ So NGINX is responsible for:
 * returning the final response to the browser;
 * acting as the only public container.
 
-Only NGINX should have a published port to the host machine.
+Only
+NGINX should have a published port to the host machine.
 
 If the browser could connect directly to WordPress/PHP-FPM, PHP-FPM would be exposed publicly. That is not the expected design. PHP-FPM expects FastCGI requests from a web server, not direct browser requests.
 
