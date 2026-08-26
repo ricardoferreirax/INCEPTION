@@ -278,6 +278,7 @@ Dynamic content is the opposite of static content.
 
 The content does not already exist as a complete file. Instead, it must be generated when the request arrives. So :
 
+
 * Code must execute.
 * Database may be queried.
 * Content must be generated.
