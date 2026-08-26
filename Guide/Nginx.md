@@ -238,6 +238,7 @@ So NGINX is the public web server that connects the browser to WordPress.
 
 # Understanding Static Content
 
+
 It is important to understand that not all website content is generated in the same way. Some content already exists on disk and can be sent immediately to the browser. Other content must be generated dynamically every time a request arrives.
 
 Static content is content that already exists as a real file on disk. No application logic needs to run, no PHP code needs to execute and no database query is required. The web server simply reads the file and sends it to the browser. Examples:
