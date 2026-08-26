@@ -348,6 +348,7 @@ Docker
 
    The daemon is usually called: dockerd
 
+
    When the Docker service is running on Linux, the daemon is active in the background.
    Example: sudo systemctl status docker
    If the daemon is stopped, Docker commands will fail because the client has nobody to talk to.
