@@ -102,6 +102,7 @@ NGINX is needed because it is the public entry point of the Inception infrastruc
 
 NGINX performs tasks that WordPress and MariaDB should not perform directly.
 
+
 In this project, the browser must not communicate directly with WordPress or MariaDB.
 
 WordPress is a PHP application. Its job is to execute application logic and generate dynamic pages.
