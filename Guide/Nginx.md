@@ -2135,6 +2135,7 @@ This makes the container lifecycle extremely simple. Docker only needs to monito
 
 # What Is A Daemon?
 
+
 A daemon is a service that runs in the background. Examples: NGINX, MariaDB, SSH and Docker. Traditionally Linux servers run services as daemons. The flow looks like:
 
 > Start Service -> Move To Background -> Keep Running
