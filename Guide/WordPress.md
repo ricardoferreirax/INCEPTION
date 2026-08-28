@@ -408,6 +408,7 @@ This is different from a build-time dependency. A build-time dependency is only 
 
 A runtime dependency is needed when the container is actually executing.
 
+
 In this Dockerfile, the installed packages are runtime dependencies because the WordPress service needs them during container execution.
 
 ``RUN`` is a Dockerfile instruction that executes commands during image build time. This means it runs when Docker builds the image, for example: ``docker compose build``. It does not run every time the container starts.
