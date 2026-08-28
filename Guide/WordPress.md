@@ -1343,6 +1343,7 @@ This is exactly how a containerized service should behave.
 
 The final line of the script should be ``exec php-fpm8.2 -F``. This line starts PHP-FPM as the final main process of the container.
 
+
 Without exec, the script would start PHP-FPM as a child process.
 
 The process tree would look like this:
