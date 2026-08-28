@@ -999,6 +999,7 @@ The container can be recreated while the WordPress files remain available.
 
 ``/run/php`` is the runtime directory used by PHP-FPM.
 
+
 Runtime files are files that exist only while a service is running. They are not permanent application data.
 Typical contents:
 
