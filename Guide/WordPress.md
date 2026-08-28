@@ -695,6 +695,7 @@ This instruction installs ``WP-CLI``, the official command-line interface for Wo
 
 WP-CLI stands for: ``WordPress Command Line Interface``. It is a tool that allows WordPress to be managed entirely from the terminal.
 
+
 Normally, when installing WordPress manually, a person must open the browser and complete the installation page.
 This works on a traditional server but creates problems inside Docker.
 
