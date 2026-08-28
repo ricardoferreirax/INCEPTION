@@ -917,6 +917,7 @@ Is the main entry point of WordPress.
 
 When a request reaches WordPress, it usually passes through this file.
 
+
 Its job is to load the WordPress environment and start the request processing.
 
 > Request arrives -> index.php -> Load WordPress core -> Connect to database -> Generate final page
