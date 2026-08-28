@@ -1191,6 +1191,7 @@ Without ``init_wordpress.sh``, the container would contain ``PHP-FPM`` and ``WP-
 
 The image would contain PHP-FPM, but nobody would generate the correct PHP-FPM pool configuration.
 
+
 The image would contain the MariaDB client, but nobody would wait for MariaDB to become ready.
 
 So the script is the runtime brain of the WordPress container. It performs the tasks that only make sense when the container is actually starting.
