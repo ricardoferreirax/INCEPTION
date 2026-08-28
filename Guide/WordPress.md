@@ -165,6 +165,7 @@ The browser understands:
 
 The browser does not execute PHP.
 
+
 The PHP code must be executed by a PHP interpreter before the browser receives the final page.
 
 So WordPress needs a PHP runtime because all of its main files are PHP files.
