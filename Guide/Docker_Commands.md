@@ -317,6 +317,7 @@ The `-d` flag means detached mode.
 
 Detached mode means the containers run in the background and the terminal becomes available immediately.
 
+
 Without `-d`, the terminal stays attached to the logs.
 
 With `-d`, Docker starts the containers and then returns control to the terminal.
