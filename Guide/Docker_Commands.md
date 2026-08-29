@@ -24,6 +24,7 @@ A complete collection of useful Docker and Docker Compose commands commonly used
 
 Build commands are used to create Docker images.
 
+
 A Docker image is like a blueprint or template. It contains everything needed to create a container: the operating system base, installed packages, copied configuration files, scripts, dependencies, and the command that should run when a container starts.
 
 In the Inception project, each service must have its own image. Usually, the project contains at least three services:
