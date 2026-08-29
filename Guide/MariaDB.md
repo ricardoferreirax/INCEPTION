@@ -622,6 +622,7 @@ When a visitor loads the website, MariaDB retrieves information from these files
 Unlike /var/lib/mysql, this directory does not contain persistent data.
 It contains runtime data.
 
+
 Runtime data exists only while MariaDB is running. Think of it as MariaDB's temporary workspace.
 
 Typical contents:
