@@ -546,6 +546,7 @@ It is more useful than `docker ps` when something failed.
 
 For example, if MariaDB started and then exited immediately, `docker ps` will not show it because it is no longer running. But `docker ps -a` will show it.
 
+
 Status ``Exited (0)``: The container stopped successfully. This usually means the main process finished without an error.
 
 Status ``Exited (1)``: The container stopped because of an error.
