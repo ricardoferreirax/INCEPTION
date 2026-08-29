@@ -176,6 +176,7 @@ Docker Compose uses the `docker-compose.yml` file to know:
 
 This command starts all services defined in the `docker-compose.yml` file.
 
+
 This command reads the `docker-compose.yml` file and starts all services. Creates the complete application stack defined inside it.
 
 When executed, Docker Compose performs multiple operations:
