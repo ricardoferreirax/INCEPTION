@@ -416,6 +416,7 @@ The ``init_mariadb.sh`` script can use it to connect to the temporary MariaDB se
 
 ### mariadb-install-db
 
+
 Is used to create the internal MariaDB system tables.
 
 These are not WordPress tables.
