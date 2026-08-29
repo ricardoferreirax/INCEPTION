@@ -946,6 +946,7 @@ When we execute, for example, ``docker compose up``, Docker does not simply crea
 
 It must know: ``What process should start first?``
 
+
 Every container needs an initial command. Without that command, Docker would create the container and immediately stop it because there would be no process keeping it alive. This is exactly what ``ENTRYPOINT`` defines.
 
 Whenever Docker starts the MariaDB container from this image: 
