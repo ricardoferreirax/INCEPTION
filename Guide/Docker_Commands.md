@@ -860,6 +860,7 @@ This removes dangling images.
 
 A dangling image is usually an image layer that no longer has a proper name or tag.
 
+
 More aggressive cleanup:
 
 <div align="center">
