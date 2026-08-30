@@ -1725,6 +1725,7 @@ ports:
 
 This instruction creates a connection between:  Host Port 443 -> Container Port 443
 
+
 Now Docker creates forwarding rules. Traffic arriving at hostname machine (Host:443) is automatically forwarded to NGINX Container:443.
 
 Without Publishing:  Browser ---> Host Machine --X--> Docker Container                -> NGINX is running and Port 443 exists, but nobody can reach it.
