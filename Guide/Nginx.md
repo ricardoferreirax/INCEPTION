@@ -202,6 +202,7 @@ GET /wp-content/uploads/logo.png - means "I want the image logo.png".
 
 NGINX receives these requests and begins analyzing them. Think of NGINX as a receptionist in a large company. People arrive at the reception desk. The receptionist asks: What do you need? Depending on the answer, the receptionist sends the visitor to the correct department. NGINX does exactly the same thing. Every request arrives at NGINX first. NGINX examines and then decides: Can I handle this myself? or Do I need to forward this elsewhere?
 
+
 This is why NGINX is often called a:
 
 * Reverse Proxy
@@ -243,6 +244,7 @@ So NGINX is the public web server that connects the browser to WordPress.
 
 
 It is important to understand that not all website content is generated in the same way. Some content already exists on disk and can be sent immediately to the browser. Other content must be generated dynamically every time a request arrives.
+
 
 Static content is content that already exists as a real file on disk. No application logic needs to run, no PHP code needs to execute and no database query is required. The web server simply reads the file and sends it to the browser. Examples:
 
