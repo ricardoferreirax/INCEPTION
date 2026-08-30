@@ -852,6 +852,7 @@ When the browser connects to NGINX using HTTPS, a TLS handshake happens before n
 
 A handshake is a negotiation phase. During this phase, the browser and NGINX agree on how to communicate securely.
 
+
 A simplified flow is:
 
 ```text
