@@ -886,6 +886,7 @@ The NGINX configuration points to it with ``ssl_certificate /etc/nginx/ssl/incep
 
 A certificate usually contains:
 
+
 * domain name - tells the browser which domain the certificate belongs to.
 * public key - is used during the TLS process.
 * issuer information and signature - tell the browser who signed the certificate.
