@@ -962,6 +962,7 @@ If one file is missing, HTTPS cannot work correctly.
 
 If the certificate and private key do not match, NGINX may fail to start or the TLS handshake may fail.
 
+
 The certificate answers: Who am I? and the private key answers: Can I prove it?
 
 Think about entering an airport. We show the passport to identify ourselves but anyone could steal a passport. So the airport also needs proof that the passport really belongs to us. The private key is that proof.
