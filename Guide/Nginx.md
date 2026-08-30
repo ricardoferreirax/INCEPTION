@@ -600,6 +600,7 @@ MariaDB stores the persistent content.
 
 NGINX can start without WordPress, but the website will not fully work unless WordPress/PHP-FPM is reachable.
 
+
 NGINX depends on WordPress for dynamic PHP pages. 
 
 For static files, NGINX can respond alone.
