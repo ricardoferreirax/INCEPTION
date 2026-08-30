@@ -77,6 +77,7 @@ NGINX is the first container that receives traffic from outside Docker. This is 
 
 The browser does not connect directly to WordPress and does not connect directly to MariaDB. 
 
+
 The browser connects to NGINX on port 443. Then NGINX decides what should happen with the request.
 
 A simplified architecture is:
