@@ -443,6 +443,7 @@ HTTP means ``HyperText Transfer Protocol``.
 
 HTTP is the protocol used by browsers and web servers to exchange web content.
 
+
 A protocol is a set of rules that defines how two systems communicate.
 
 HTTP is the communication language used by browsers and web servers. When a browser requests a page, it sends an HTTP request. When a server responds, it sends an HTTP response.
