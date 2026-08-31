@@ -1383,6 +1383,7 @@ The option ``-F`` means foreground mode.
 
 Normally, services can daemonize, which means they detach and move into the background. That is normal on traditional Linux systems managed by systemd.
 
+
 Docker containers work differently. Docker expects the main process to stay in the foreground.
 
 If PHP-FPM moved to the background, the entrypoint script could finish, PID 1 would exit, and Docker would stop the container.
