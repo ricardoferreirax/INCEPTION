@@ -201,6 +201,7 @@ The flow is:
 
 > NGINX receives /index.php -> sends FastCGI request to PHP-FPM -> PHP-FPM executes WordPress PHP code -> PHP-FPM returns generated HTML -> NGINX sends HTML to the browser
 
+
 So PHP-FPM acts as the bridge between NGINX and PHP execution.
 
 ## WordPress Needs MariaDB
