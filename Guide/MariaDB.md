@@ -566,6 +566,7 @@ the database from zero again.
 
 This directory contains the MariaDB internal system database.
 
+
 This database is created by: ``mariadb-install-db`` during initialization.
 
 It contains critical information used by MariaDB itself.
