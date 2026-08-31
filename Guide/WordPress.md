@@ -1299,6 +1299,7 @@ The startup process is:
 
 Without an entrypoint, Docker would not know which command should start the service.
 
+
 A Docker image is only a template.
 
 The container is the running instance.
