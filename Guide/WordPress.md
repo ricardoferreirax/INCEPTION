@@ -405,6 +405,7 @@ A runtime dependency is software that an application needs while it is running. 
 
 WordPress also needs to connect to MariaDB while it is running. Therefore the PHP MySQL/MariaDB extension is a runtime dependency.
 
+
 This is different from a build-time dependency. A build-time dependency is only needed to build or prepare the image.
 
 A runtime dependency is needed when the container is actually executing.
