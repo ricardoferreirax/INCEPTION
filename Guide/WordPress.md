@@ -95,6 +95,7 @@ Instead, a complete chain of operations happens. ``NGINX`` receives the HTTPS re
 PHP-FPM executes the WordPress PHP code. WordPress reads its configuration from: ``/var/www/html/wp-config.php``.
 Inside that file, WordPress finds the database connection information:
 
+
 * database host;
 * database name;
 * database user;
