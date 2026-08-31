@@ -321,6 +321,7 @@ For example, without apt-get update, this command: ``apt-get install -y mariadb-
 
 So before installing MariaDB, we refresh the package information.
 
+
 This command downloads the latest package repository indexes from Debian repositories. This allows apt to know which packages are available and where they can be downloaded from.
 
 ---
