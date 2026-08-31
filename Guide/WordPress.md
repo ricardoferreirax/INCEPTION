@@ -173,6 +173,7 @@ So WordPress needs a PHP runtime because all of its main files are PHP files.
 
 When WordPress runs, PHP loads these files, executes the WordPress logic, queries the database when necessary, and generates the final HTML response.
 
+
 Without PHP, the WordPress files would just be text files. They would exist on disk, but nothing would execute them.
 
 ## WordPress Needs PHP-FPM
