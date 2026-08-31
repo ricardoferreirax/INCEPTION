@@ -488,6 +488,7 @@ PHP-FPM manages a pool of PHP worker processes.
 
 A worker process is a PHP process waiting to handle a request.
 
+
 When NGINX sends a PHP request, PHP-FPM assigns that request to an available worker.
 
 The worker:
