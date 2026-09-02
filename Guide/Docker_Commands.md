@@ -267,6 +267,7 @@ We use this after modifying:
 
 * Dockerfiles
 * Shell scripts
+* 
 * Configuration files
 * `docker-compose.yml`
 * Files copied into the image during build
