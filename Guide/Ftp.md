@@ -174,6 +174,7 @@ One of the most important concepts in FTP is the difference between Active Mode 
 
 Both modes achieve the same goal: creating the data connection required for file transfers.
 
+
 The difference lies in who initiates that second connection.
 
 ---
