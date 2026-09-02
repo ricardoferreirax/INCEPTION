@@ -431,6 +431,7 @@ Port: 21
 
 So when we create: ``useradd -m -d /var/www/html -s /bin/bash ftpuser``, we are creating a Linux user called: ``ftpuser``.
 
+
 Then this line: ``echo "$FTP_USER:$FTP_PASSWORD" | chpasswd``, sets the password for that user.
 
 When FileZilla sends the username and password, vsftpd checks whether that Linux user exists and whether the password is correct.
