@@ -979,6 +979,7 @@ This tells Docker:
 
 Use this command when:
 
+
 * We want to confirm where data is stored.
 * We want to check if the bind mount path is correct.
 * We want to verify Inception subject requirements.
