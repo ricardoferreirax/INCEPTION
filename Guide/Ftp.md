@@ -212,6 +212,7 @@ These systems frequently block incoming connections. As a result, Active Mode of
 
 Passive Mode solves this problem by reversing the process. The client still creates the control connection:
 
+
 > Client -> Server:21
 
 However, when data transfer is required, the server says: ``I am listening on another port. You connect to me there``.
