@@ -390,6 +390,7 @@ A daemon is a service that runs in the background and waits for requests. In thi
 
 When a client such as FileZilla connects, vsftpd handles:
 
+
 * accepting the connection;
 * asking for username and password;
 * authenticating the user;
