@@ -1126,6 +1126,7 @@ This instruction copies the custom WordPress initialization script from the proj
 
 At this point in the Dockerfile, the image already contains the basic tools needed to run WordPress:
 
+
 * PHP-FPM;
 * PHP MySQL/MariaDB extension;
 * MariaDB client;
