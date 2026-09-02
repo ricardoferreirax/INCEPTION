@@ -731,6 +731,7 @@ When the WordPress container starts, the initialization script must be capable o
 
 WP-CLI makes all of this possible.
 
+
 Without WP-CLI the script would have no easy way to configure WordPress automatically.
 
 The startup sequence becomes:
