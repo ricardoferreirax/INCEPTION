@@ -466,6 +466,7 @@ sudo apt install -y code
 
 Installs Visual Studio Code.
 
+
 ---
 
 ## f) Launch VS Code
