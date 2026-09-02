@@ -486,6 +486,7 @@ This is necessary because NGINX does not execute PHP by itself.
 
 ### What PHP-FPM Actually Does
 
+
 PHP-FPM manages a pool of PHP worker processes.
 
 A worker process is a PHP process waiting to handle a request.
