@@ -474,6 +474,7 @@ It should only manage the database.
 
 ## WordPress Container
 
+
 The WordPress container usually runs PHP-FPM.
 
 PHP-FPM executes PHP code.
