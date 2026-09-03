@@ -577,6 +577,7 @@ Nginx and PHP-FPM are separated into different containers.
 
 # 13. What Is MariaDB?
 
+
 MariaDB is a relational database management system.
 
 WordPress uses MariaDB to store most of its important information.
