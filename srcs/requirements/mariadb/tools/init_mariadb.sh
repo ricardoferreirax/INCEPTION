@@ -1,26 +1,18 @@
 #!/bin/bash
 
+# stop the script immediately if any command fails and if an undefined variable is used
 set -eu
 
 MARIADB_DATA_DIR="/var/lib/mysql"
 MARIADB_RUN_DIR="/run/mysqld"
-
-# path where MariaDB configuration files are stored
 MARIADB_CONFIG_DIR="/etc/mysql/mariadb.conf.d"
-
-# config file created by this script
 MARIADB_CONFIG_FILE="$MARIADB_CONFIG_DIR/docker.cnf"
-
-# unix socket used to communicate with MariaDB locally.
 MARIADB_SOCKET="$MARIADB_RUN_DIR/mysqld.sock"
-
-# file used to mark that the database was already initialized.
 MARIADB_INIT_FILE="$MARIADB_DATA_DIR/.mariadb_ready"
 
-
 echo "[MARIADB] >> Verifying required Docker secrets..."
-if [ -f /run/secrets/db_password ]; then
 
+if [ -f /run/secrets/db_password ]; then
 	DB_PASSWORD=$(cat /run/secrets/db_password)
 else
 	echo "[ERROR] >> db_password secret not found."
@@ -34,21 +26,19 @@ else
 	exit 1
 fi
 
-
-# create the MariaDB runtime directory if it does not exist.
+# create the runtime dir if it doesn't already exist, MariaDB needs this to create its unix socket.
 mkdir -p "$MARIADB_RUN_DIR"
 
-# create the MariaDB data directory if it does not exist.
+# create the data dir if it doesn't already exist, the database files will be stored here.
 mkdir -p "$MARIADB_DATA_DIR"
 
-# create the MariaDB configuration directory if it does not exist.
+# create the MariaDB config dir
 mkdir -p "$MARIADB_CONFIG_DIR"
 
 chown -R mysql:mysql "$MARIADB_RUN_DIR" "$MARIADB_DATA_DIR"
 
 echo "[MARIADB] >> Creating MariaDB configuration file..."
 
-# create the MariaDB server configuration file.
 cat > "$MARIADB_CONFIG_FILE" << EOF
 [mysqld]
 bind-address=0.0.0.0
@@ -57,62 +47,70 @@ datadir=${MARIADB_DATA_DIR}
 socket=${MARIADB_SOCKET}
 EOF
 
-# check if MariaDB was already initialized
+# checks if the marker exists, prevents recreating the database and users every time the container restarts.
 if [ -f "$MARIADB_INIT_FILE" ]; then
 	echo "[MARIADB] >> Existing MariaDB setup detected. Skipping initialization."
+
 else
 	echo "[MARIADB] >> No initialization marker found. Preparing data directory..."
 
-	# check if the MariaDB system tables already exist.
+	# if the data directory is empty, we need to create the system tables and set up the database and users.
 	if [ ! -d "$MARIADB_DATA_DIR/mysql" ]; then
 		echo "[MARIADB] >> Installing MariaDB system tables..."
-		
-		mariadb-install-db --user=mysql --datadir="$MARIADB_DATA_DIR"  # Initialize the MariaDB data directory and system tables.
+
+		# initialize MariaDB's internal database structure.
+		mariadb-install-db --user=mysql --datadir="$MARIADB_DATA_DIR"
+
 	else
-		echo "[MARIADB] >> MariaDB system tables already exist."   # Do not recreate the system tables if they already exist.
+		echo "[MARIADB] >> MariaDB system tables already exist."
+
 	fi
 
 	echo "[MARIADB] >> Starting temporary MariaDB server..."
 
-	# Start MariaDB temporarily without network access.
+	# start a temporary MariaDB server in the background, this is required cause SQL commands can't be executed until MariaDB is running.
 	mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET" --skip-networking &
 
-	MARIADB_PID=$!   # Save the PID of the temporary MariaDB process
+	# save the PID of temporary MariaDB process, we need it later to wait for the process to completely finish.
+	MARIADB_PID=$!
 
 	echo "[MARIADB] >> Waiting for temporary MariaDB server..."
 
-	MARIADB_READY=0  # start with MariaDB marked as not ready
+	# initially we assume that MariaDB is not ready.
+	MARIADB_READY=0
 
-	# try for a maximum of 30 seconds to connect to MariaDB.
-	for i in {1..30}; do
+	# try to connect up to 10 times, each failed attempt waits 1 second before trying again, so the maximum waiting time is 10 seconds.
+	for i in {1..10}; do
 
-		# test if the temporary MariaDB server accepts local connections
-		if mariadb --socket="$MARIADB_SOCKET" -u root -e "SELECT 1" >/dev/null 2>&1 
+		# SELECT 1 is a query used to check if MariaDB is ready to receive SQL commands.
+		if mariadb --socket="$MARIADB_SOCKET" -u root -e "SELECT 1" >/dev/null 2>&1
 		then
-			MARIADB_READY=1  # Mark MariaDB as ready.
-			break  # stop waiting because MariaDB is ready.
+
+			MARIADB_READY=1
+			break
+
 		fi
 
-		# wait before trying the connection again.
 		echo "[MARIADB] >> Waiting for MariaDB..."
 		sleep 1
+
 	done
 
-	# check if MariaDB failed to start after all attempts.
+	# if MariaDB never became ready, stop the temporary process and exit with an error instead of waiting forever.
 	if [ "$MARIADB_READY" -ne 1 ]; then
 		echo "[ERROR] >> Temporary MariaDB server failed to start."
 
-		kill "$MARIADB_PID" 2>/dev/null || true    # stop the temporary process if it is still running.
-		wait "$MARIADB_PID" 2>/dev/null || true    # wait for the temporary process to terminate.
+		kill "$MARIADB_PID" 2>/dev/null || true
+		wait "$MARIADB_PID" 2>/dev/null || true
 
-		exit 1  # Stop the initialization script with an error.
+		exit 1
+
 	fi
 
 	echo "[MARIADB] >> Creating database, user and privileges..."
 
-	# connect as root through the local socket and execute the initialization SQL.
+	# Connect locally as root and configure the database
 	mariadb --socket="$MARIADB_SOCKET" -u root << EOF
-
 CREATE DATABASE IF NOT EXISTS \`${MDB_DATABASE}\`;
 CREATE USER IF NOT EXISTS '${MDB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';
 ALTER USER '${MDB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';
@@ -123,7 +121,7 @@ EOF
 
 	echo "[MARIADB] >> Creating MariaDB initialization marker..."
 
-	# create a file indicating that initialization completed successfully.
+	# create the marker only after all SQL initialization succeeded.
 	touch "$MARIADB_INIT_FILE"
 
 	chown mysql:mysql "$MARIADB_INIT_FILE"
@@ -133,12 +131,14 @@ EOF
 	# stop the temporary MariaDB server.
 	mariadb-admin --socket="$MARIADB_SOCKET" -u root -p"${DB_ROOT_PASSWORD}" shutdown
 
-	wait "$MARIADB_PID" || true   # wait for the temporary MariaDB process to fully terminate.
+	# wait until the temporary server process has fully exited before starting the permanent MariaDB process.
+	wait "$MARIADB_PID" || true
 
 	echo "[MARIADB] >> MariaDB initialization completed."
+
 fi
 
 echo "[MARIADB] >> Starting MariaDB in foreground..."
 
-# replace the script with MariaDB so mariadbd becomes PID 1.
+# start real MariaDB server, exec replaces the Bash script with mariadbd, this makes MariaDB PID 1 inside the container.
 exec mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET" --port="$MDB_PORT"
