@@ -75,7 +75,7 @@ services:
       - inception
     ports:
       - "21:21"
-      - "${FTP_PASV_MIN_PORT}-${FTP_PASV_MAX_PORT}:${FTP_PASV_MIN_PORT}-${FTP_PASV_MAX_PORT}"
+      - "40000-40010:40000-40010"
     env_file:
       - .env
     secrets:

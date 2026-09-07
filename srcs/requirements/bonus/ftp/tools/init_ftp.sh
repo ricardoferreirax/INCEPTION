@@ -1,64 +1,69 @@
 #!/bin/bash
 
-set -e
+# stop immediately if any command fails and if an undefined variable is used.
+set -eu
 
-FTP_ROOT_DIR="/var/www/html"
-FTP_CONFIG_FILE="/etc/vsftpd.conf"
-FTP_PASSWORD_FILE="/run/secrets/ftp_password"
+FTP_ROOT="/var/www/html"
+VSFTPD_CONFIG_FILE="/etc/vsftpd.conf"
+VSFTPD_SECURE_DIR="/var/run/vsftpd/empty"
 
 echo "[FTP] >> Verifying required Docker secrets..."
-if [ -f "$FTP_PASSWORD_FILE" ]; then
-	FTP_PASSWORD=$(cat "$FTP_PASSWORD_FILE")
+
+if [ -f /run/secrets/ftp_password ]; then
+	FTP_PASSWORD=$(cat /run/secrets/ftp_password)
 else
 	echo "[ERROR] >> ftp_password secret not found."
 	exit 1
 fi
 
-echo "[FTP] >> Checking required environment variables..."
-if [ -z "$FTP_USER" ] || [ -z "$FTP_PASV_MIN_PORT" ] || [ -z "$FTP_PASV_MAX_PORT" ]; then
-	echo "[ERROR] >> FTP_USER, FTP_PASV_MIN_PORT or FTP_PASV_MAX_PORT is missing."
-	exit 1
-fi
+echo "[FTP] >> Creating required directories..."
 
-mkdir -p "$FTP_ROOT_DIR"
-mkdir -p /var/run/vsftpd/empty
+mkdir -p "$FTP_ROOT"
+mkdir -p "$VSFTPD_SECURE_DIR"
 
-echo "[FTP] >> Preparing www-data group..."
-if ! getent group www-data >/dev/null 2>&1; then
-	groupadd -g 33 www-data
-fi
+echo "[FTP] >> Configuring FTP user..."
 
-echo "[FTP] >> Creating FTP user..."
+# create the FTP user only if it doesn't exist. User's home dir is set to the WordPress dir allowing FTP access directly to the website files.
 if ! id "$FTP_USER" >/dev/null 2>&1; then
-	useradd -m -d "$FTP_ROOT_DIR" -s /bin/bash "$FTP_USER"
+	useradd -d "$FTP_ROOT" -s /bin/bash "$FTP_USER"
+
+	# set the FTP user's password using the docker secret.
+	echo "${FTP_USER}:${FTP_PASSWORD}" | chpasswd
+
+	# add FTP user to the www-data group so it can access files shared with the WordPress service.
+	usermod -aG www-data "$FTP_USER"
+else
+	echo "[FTP] >> FTP user already exists."
 fi
 
-echo "[FTP] >> Adding FTP user to www-data group..."
-usermod -aG www-data "$FTP_USER"
+echo "[FTP] >> Updating WordPress directory permissions..."
 
-echo "[FTP] >> Setting FTP user password..."
-echo "$FTP_USER:$FTP_PASSWORD" | chpasswd
+chown -R www-data:www-data "$FTP_ROOT"
 
-echo "[FTP] >> Updating FTP root ownership and permissions..."
-chown -R www-data:www-data "$FTP_ROOT_DIR"
-chmod -R 775 "$FTP_ROOT_DIR"
+# give the www-data group write permission, so that the FTP user can upload, modify and delete files through FTP.
+chmod -R g+w "$FTP_ROOT"
 
 echo "[FTP] >> Creating vsftpd configuration file..."
-cat > "$FTP_CONFIG_FILE" << EOF
+
+cat > "$VSFTPD_CONFIG_FILE" << EOF
 listen=YES
 listen_ipv6=NO
+listen_port=21
 anonymous_enable=NO
 local_enable=YES
 write_enable=YES
-local_umask=002
+pasv_enable=YES
+pasv_address=127.0.0.1
+pasv_min_port=40000
+pasv_max_port=40010
 chroot_local_user=YES
 allow_writeable_chroot=YES
-local_root=${FTP_ROOT_DIR}
-pasv_enable=YES
-pasv_min_port=${FTP_PASV_MIN_PORT}
-pasv_max_port=${FTP_PASV_MAX_PORT}
-pasv_address=127.0.0.1
+secure_chroot_dir=${VSFTPD_SECURE_DIR}
+local_umask=022
+ssl_enable=NO
 EOF
 
 echo "[FTP] >> Starting vsftpd in foreground..."
-exec /usr/sbin/vsftpd "$FTP_CONFIG_FILE"
+
+# start vsftpd in the foreground, exec replaces the Bash script with vsftpd, making it PID 1
+exec vsftpd "$VSFTPD_CONFIG_FILE"

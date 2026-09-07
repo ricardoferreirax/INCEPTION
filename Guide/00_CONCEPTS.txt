@@ -43,217 +43,26 @@
 #
 # The number of child processes created on startup. Used only when pm is set to 'dynamic'
 
-FTP Dockerfile
 
-The FTP Dockerfile
 
-FROM debian:bookworm
 
-Installing vsftpd
 
-What Is vsftpd?
 
-Why vsftpd?
 
-What Is An FTP User?
 
-Why Create A Dedicated FTP User?
 
-Linux Users And Permissions
 
-Users, Groups And Ownership
 
-Why ftpuser Is Added To www-data
 
-Understanding chmod 775
 
-Understanding chgrp
 
-Understanding Docker Volumes
 
-How FTP And WordPress Share The Same Volume
 
-Why FTP Must Not Have Its Own Files
 
-How File Uploads Become Visible In WordPress
 
-FTP Configuration File
 
-Detailed Explanation Of Every Directive
 
-listen
 
-listen_ipv6
-
-anonymous_enable
-
-local_enable
-
-write_enable
-
-local_umask
-
-chroot_local_user
-
-allow_writeable_chroot
-
-local_root
-
-pasv_enable
-
-pasv_min_port
-
-pasv_max_port
-
-userlist_enable
-
-userlist_file
-
-userlist_deny
-
-Starting vsftpd
-
-COPY init_ftp.sh
-
-chmod +x
-
-EXPOSE
-
-ENTRYPOINT
-
-Why exec Is Important
-
-PID 1
-
-Foreground Process
-
-How To Test FTP
-
-Using Linux ftp
-
-Using FileZilla
-
-Testing Uploads
-
-Testing Downloads
-
-Verifying Shared Volume
-
-Live Coding Examples
-
-Changing FTP User
-
-Changing FTP Port
-
-Changing Passive Ports
-
-How To Demonstrate The Bonus During Evaluation
-
-Common Errors
-
-530 Login Incorrect
-
-553 Could Not Create File
-
-500 OOPS Invalid pasv_address
-
-425 Failed To Establish Connection
-
-Permission Denied
-
-Conclusion
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-docker exec -it wordpress sh
-cd /var/www/html
-wp core is-installed --allow-root
-wp user list --allow-root
-wp option get siteurl --allow-root
-
-
-docker exec -it wordpress mariadb -h mariadb -P 3307 -u rmedeiro -p wordpress (password -> db_password.txt)
-SHOW VARIABLES LIKE 'port';
-
-SELECT user_login FROM wp_users;
-
-Confirma com: docker exec -it wordpress ss -lntp
-Se não tiveres ss, instala ou usa:
-docker exec -it wordpress bash
-apt update && apt install -y iproute2
-ss -lntp
-
-
-1. Instalar FileZilla: sudo apt install filezilla -y
-2. Abrir no terminal: filezilla
-3. Configurar ligação no FileZilla:
-
-Host: rickymercury.42.fr
-Username: ftpuser
-Password: password do secrets/ftp_password.txt
-Port: 21
-
-Clica em: Quickconnect
-Se pedir confirmação, aceita.
-
-4. O que deves ver
-
-Painel esquerdo -> Ficheiros do teu Debian.
-Por exemplo: test.txt
-			 bonus.html
-
-Painel direito -> Ficheiros do WordPress -> Conteúdo de /var/www/html do container FTP.
-
-Normalmente: index.php
-			 wp-admin
-			 wp-content
-			 wp-includes
-			 wp-config.php
-
-Isso prova que o FTP está apontado para o volume do WordPress.
-
-
-5. Criar ficheiro para teste
-
-No terminal: echo "<h1>FTP BONUS WORKS</h1>" > bonus.html
-
-6. Fazer upload no FileZilla
-
-No painel da esquerda, procura o ficheiro: bonus.html
-
-Arrasta para o painel da direita.
-
-Deve aparecer em baixo: Successful transfers
-
-7. Confirmar no host: ls -l /home/rickymercury/data/wordpress/bonus.html
-
-8. Confirmar no container WordPress: docker exec -it wordpress ls -l /var/www/html/bonus.html
-
-9. Mostrar no browser
-
-Abre: https://rickymercury.42.fr/bonus.html
-
-Deve aparecer: FTP BONUS WORKS
 
 
 
