@@ -42,8 +42,6 @@ mkdir -p "$PHP_FPM_CONFIG_DIR"
 chown -R www-data:www-data "$WORDPRESS_DIR" "$PHP_FPM_RUN_DIR"
 
 echo "[WORDPRESS] >> Creating PHP-FPM configuration file..."
-
-# Create the PHP-FPM pool configuration.
 cat > "$PHP_FPM_CONFIG_FILE" << EOF
 [www]
 user = www-data
@@ -75,9 +73,7 @@ for i in {1..10}; do
 		# if this succeeds, MariaDB is running, the database exists, the user exists and pass is correct.
 		MARIADB_READY=1
 		break
-
 	fi
-
 	echo "[WORDPRESS] >> MariaDB is not ready yet..."
 	sleep 2
 
@@ -93,23 +89,17 @@ fi
 if [ ! -f "$WP_CONFIG_FILE" ]; then
 
 	echo "[WORDPRESS] >> Downloading WordPress core files..."
-
-	# download the WordPress core files using WP-CLI.
 	wp core download --allow-root
 
 	echo "[WORDPRESS] >> Creating wp-config.php..."
-
 	# create wp-config.php with the MariaDB connection information. The host uses name "mariadb" instead of localhost cause MariaDB runs in another container.
 	wp config create --dbname="$MDB_DATABASE" --dbuser="$MDB_USER" --dbpass="$DB_PASSWORD" --dbhost="${MDB_HOST}:${MDB_PORT}" --allow-root
 
 	echo "[WORDPRESS] >> Installing WordPress site..."
-
 	# perform the initial WordPress installation, this creates the site config and the admin account.
 	wp core install --url="$WP_FULL_URL" --title="$WP_TITLE" --admin_user="$WP_ADMIN_USER" --admin_password="$WP_ADMIN_PASSWORD" --admin_email="$WP_ADMIN_EMAIL" --skip-email --allow-root
 
-	echo "[WORDPRESS] >> Creating additional WordPress user..."
-
-	# create the second WordPress account required
+	echo "[WORDPRESS] >> Creating the second WordPress user..."
 	wp user create "$WP_USER" "$WP_USER_EMAIL" --user_pass="$WP_USER_PASSWORD" --role="$WP_USER_ROLE" --allow-root
 
 	echo "[WORDPRESS] >> WordPress installation completed."
@@ -120,7 +110,6 @@ else
 fi
 
 echo "[WORDPRESS] >> Updating WordPress file ownership..."
-
 chown -R www-data:www-data "$WORDPRESS_DIR"
 
 echo "[WORDPRESS] >> Starting PHP-FPM in foreground..."
