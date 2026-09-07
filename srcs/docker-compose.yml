@@ -41,6 +41,7 @@ services:
       - wp_user_password
     depends_on:
       - mariadb
+      - redis
     restart: on-failure
 
   nginx:
@@ -84,11 +85,23 @@ services:
       - wordpress
     restart: on-failure
 
+  redis:
+    build:
+      context: ./requirements/bonus/redis
+      dockerfile: Dockerfile
+    image: redis
+    pull_policy: never
+    container_name: redis
+    networks:
+      - inception
+    expose:
+      - "6379"
+    restart: on-failure
+
 networks:
 
   inception:
     driver: bridge
-
 
 volumes:
 
