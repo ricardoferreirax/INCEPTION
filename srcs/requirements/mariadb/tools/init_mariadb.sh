@@ -26,19 +26,13 @@ else
 	exit 1
 fi
 
-# create the runtime dir if it doesn't already exist, MariaDB needs this to create its unix socket.
 mkdir -p "$MARIADB_RUN_DIR"
-
-# create the data dir if it doesn't already exist, the database files will be stored here.
 mkdir -p "$MARIADB_DATA_DIR"
-
-# create the MariaDB config dir
 mkdir -p "$MARIADB_CONFIG_DIR"
 
 chown -R mysql:mysql "$MARIADB_RUN_DIR" "$MARIADB_DATA_DIR"
 
 echo "[MARIADB] >> Creating MariaDB configuration file..."
-
 cat > "$MARIADB_CONFIG_FILE" << EOF
 [mysqld]
 bind-address=0.0.0.0
@@ -57,8 +51,6 @@ else
 	# if the data directory is empty, we need to create the system tables and set up the database and users.
 	if [ ! -d "$MARIADB_DATA_DIR/mysql" ]; then
 		echo "[MARIADB] >> Installing MariaDB system tables..."
-
-		# initialize MariaDB's internal database structure.
 		mariadb-install-db --user=mysql --datadir="$MARIADB_DATA_DIR"
 
 	else
@@ -85,12 +77,9 @@ else
 		# SELECT 1 is a query used to check if MariaDB is ready to receive SQL commands.
 		if mariadb --socket="$MARIADB_SOCKET" -u root -e "SELECT 1" >/dev/null 2>&1
 		then
-
 			MARIADB_READY=1
 			break
-
 		fi
-
 		echo "[MARIADB] >> Waiting for MariaDB..."
 		sleep 1
 
@@ -99,10 +88,8 @@ else
 	# if MariaDB never became ready, stop the temporary process and exit with an error instead of waiting forever.
 	if [ "$MARIADB_READY" -ne 1 ]; then
 		echo "[ERROR] >> Temporary MariaDB server failed to start."
-
 		kill "$MARIADB_PID" 2>/dev/null || true
 		wait "$MARIADB_PID" 2>/dev/null || true
-
 		exit 1
 
 	fi
@@ -123,7 +110,6 @@ EOF
 
 	# create the marker only after all SQL initialization succeeded.
 	touch "$MARIADB_INIT_FILE"
-
 	chown mysql:mysql "$MARIADB_INIT_FILE"
 
 	echo "[MARIADB] >> Stopping temporary MariaDB server..."
