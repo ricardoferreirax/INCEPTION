@@ -753,9 +753,11 @@ NGINX needs these files because the Inception subject requires the website to be
 
 ##  What Is TLS?
 
+
 TLS means ``Transport Layer Security``.
 
 TLS is the modern security protocol used by HTTPS to protect communication between a client and a server.
+
 
 In this project, the client is usually the browser, and the server is NGINX.
 
