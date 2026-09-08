@@ -32,6 +32,7 @@ To understand this Dockerfile properly, we first need to understand what WordPre
 
 WordPress is a Content Management System, commonly called a CMS.
 
+
 A CMS is software that allows users to create, edit, organize and publish website content without manually writing every HTML page by hand.
 
 For example, with WordPress, an administrator can log into the dashboard and create:
