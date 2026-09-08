@@ -1167,6 +1167,7 @@ So, this line transforms a generic Debian container with NGINX installed into a 
 
 ## Why the Initialization Script Is Needed
 
+
 The script is needed because NGINX needs configuration that depends on runtime values.
 
 Runtime means the moment when the container is actually started with: docker compose up. So, the script runs when the container starts. Otherwise, the Dockerfile runs during image build time.
