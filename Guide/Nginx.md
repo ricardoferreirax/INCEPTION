@@ -820,6 +820,7 @@ So the server is essentially saying: ``Trust me, I am who I say I am``. The encr
 
 For Inception, a self-signed certificate is acceptable because:
 
+
 * the project runs locally
 * the domain is mapped manually in /etc/hosts
 * the goal is to configure HTTPS manually
