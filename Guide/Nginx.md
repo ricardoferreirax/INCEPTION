@@ -1250,6 +1250,7 @@ In this project, the script usually creates a file such as: ``/etc/nginx/conf.d/
 
 This file becomes the main website server configuration for the container.
 
+
 The NGINX configuration depends on values that only exist when the container starts.
 
 ---
