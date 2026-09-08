@@ -1572,6 +1572,7 @@ So, NGINX does not execute PHP itself. So when a PHP file is requested, NGINX fo
 
 PHP-FPM needs this information to correctly understand and execute the PHP request.
 
+
 Without these parameters, PHP-FPM would not receive enough context to execute the PHP request properly.
 
 ``fastcgi_pass wordpress:9000;`` tells NGINX where PHP-FPM is located and where to send the PHP requests. 
