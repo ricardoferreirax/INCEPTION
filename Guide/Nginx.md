@@ -410,6 +410,7 @@ FastCGI is the protocol used by NGINX to communicate with PHP-FPM.
 
 A protocol is a set of rules that defines how two programs communicate and exchange information.
 
+
 In this project:
 
 ```text
