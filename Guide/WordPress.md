@@ -1081,6 +1081,7 @@ If these directories belonged to root, PHP-FPM might not be able to modify them.
 Imagine ``wp-content/uploads`` belongs to ``root`` but PHP-FPM runs as ``www-data``, and now a user uploads an image. WordPress tries to create a file inside ``wp-content/uploads``. Linux checks permissions. Linux sees ``www-data`` is not the owner. Result: Permission denied. Upload fails.
 This is why ownership is critical.
 
+
 ``chown -R www-data:www-data`` means:
 
 ```text
