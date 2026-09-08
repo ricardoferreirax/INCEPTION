@@ -1335,6 +1335,7 @@ ENTRYPOINT ["php-fpm8.2", "-F"]
 
 ## Why the Container Becomes Self-Configuring
 
+
 A self-configuring container is a container that can start and prepare itself automatically.
 
 In this project, that means the WordPress container can start from an empty volume and configure the site without manual browser installation.
