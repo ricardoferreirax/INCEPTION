@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# stop immediately if any command fails and if an undefined variable is used.
+# Stop immediately if any command fails or if an undefined variable is used.
 set -eu
 
 WORDPRESS_DIR="/var/www/html"
@@ -9,26 +9,12 @@ PHP_FPM_RUN_DIR="/run/php"
 PHP_FPM_CONFIG_DIR="/etc/php/8.2/fpm/pool.d"
 PHP_FPM_CONFIG_FILE="$PHP_FPM_CONFIG_DIR/www.conf"
 
-echo "[WORDPRESS] >> Verifying required Docker secrets..."
-
-if [ -f /run/secrets/db_password ]; then
+if [ -f /run/secrets/db_password ] && [ -f /run/secrets/wp_admin_password ] && [ -f /run/secrets/wp_user_password ]; then
 	DB_PASSWORD=$(cat /run/secrets/db_password)
-else
-	echo "[ERROR] >> db_password secret not found."
-	exit 1
-fi
-
-if [ -f /run/secrets/wp_admin_password ]; then
 	WP_ADMIN_PASSWORD=$(cat /run/secrets/wp_admin_password)
-else
-	echo "[ERROR] >> wp_admin_password secret not found."
-	exit 1
-fi
-
-if [ -f /run/secrets/wp_user_password ]; then
 	WP_USER_PASSWORD=$(cat /run/secrets/wp_user_password)
 else
-	echo "[ERROR] >> wp_user_password secret not found."
+	echo "[ERROR] >> Required WordPress secrets not found."
 	exit 1
 fi
 
@@ -56,63 +42,61 @@ pm.min_spare_servers = 1
 pm.max_spare_servers = 3
 clear_env = no
 EOF
+echo "[WORDPRESS] >> PHP-FPM configuration created successfully."
 
 # move into the WordPress dir so WP-CLI commands operate on the correct installation.
 cd "$WORDPRESS_DIR"
 
-echo "[WORDPRESS] >> Waiting for MariaDB..."
+echo "[WORDPRESS] >> Waiting for MariaDB connection..."
+echo "[WORDPRESS] >> Database: $MDB_DATABASE"
+echo "[WORDPRESS] >> Database user: $MDB_USER"
 
-# start assuming MariaDB is unavailable.
 MARIADB_READY=0
-
 for i in {1..10}; do
-
-	# attempt a SQL query using the WordPress database account.
+	# SELECT 1 verifies that MariaDB is running and that the WordPress database credentials work.
 	if mariadb -h "$MDB_HOST" -P "$MDB_PORT" -u "$MDB_USER" -p"$DB_PASSWORD" "$MDB_DATABASE" -e "SELECT 1" >/dev/null 2>&1
 	then
-		# if this succeeds, MariaDB is running, the database exists, the user exists and pass is correct.
 		MARIADB_READY=1
+		echo "[WORDPRESS] >> MariaDB connection established."
 		break
 	fi
-	echo "[WORDPRESS] >> MariaDB is not ready yet..."
+	echo "[WORDPRESS] >> Waiting for MariaDB to be ready..."
 	sleep 2
-
 done
 
-# if MariaDB is still unavailable after all attempts, we stop container instead of waiting forever.
 if [ "$MARIADB_READY" -ne 1 ]; then
-	echo "[ERROR] >> MariaDB connection failed."
+	echo "[ERROR] >> WordPress could not connect to MariaDB."
 	exit 1
 fi
 
-# install WordPress only when wp-config.php doesn't exist, this prevents from being reinstalled on every restart.
+# if  wp-config.php does not exist
 if [ ! -f "$WP_CONFIG_FILE" ]; then
-
+	echo "[WORDPRESS] >> No wp-config.php found. WordPress installation is required."
 	echo "[WORDPRESS] >> Downloading WordPress core files..."
 	wp core download --allow-root
 
 	echo "[WORDPRESS] >> Creating wp-config.php..."
-	# create wp-config.php with the MariaDB connection information. The host uses name "mariadb" instead of localhost cause MariaDB runs in another container.
 	wp config create --dbname="$MDB_DATABASE" --dbuser="$MDB_USER" --dbpass="$DB_PASSWORD" --dbhost="${MDB_HOST}:${MDB_PORT}" --allow-root
 
 	echo "[WORDPRESS] >> Installing WordPress site..."
-	# perform the initial WordPress installation, this creates the site config and the admin account.
+	echo "[WORDPRESS] >> Site title: $WP_TITLE"
+	echo "[WORDPRESS] >> Admin user: $WP_ADMIN_USER"
 	wp core install --url="$WP_FULL_URL" --title="$WP_TITLE" --admin_user="$WP_ADMIN_USER" --admin_password="$WP_ADMIN_PASSWORD" --admin_email="$WP_ADMIN_EMAIL" --skip-email --allow-root
 
-	echo "[WORDPRESS] >> Creating the second WordPress user..."
+	echo "[WORDPRESS] >> Creating second WordPress user: $WP_USER"
 	wp user create "$WP_USER" "$WP_USER_EMAIL" --user_pass="$WP_USER_PASSWORD" --role="$WP_USER_ROLE" --allow-root
 
-	echo "[WORDPRESS] >> WordPress installation completed."
+	echo "[WORDPRESS] >> WordPress initialization completed."
 
 else
-	echo "[WORDPRESS] >> Existing WordPress installation detected."
-
+	echo "[WORDPRESS] >> Existing wp-config.php! Skip reinstalling WordPress and recreating users!"
 fi
 
 echo "[WORDPRESS] >> Updating WordPress file ownership..."
 chown -R www-data:www-data "$WORDPRESS_DIR"
 
-echo "[WORDPRESS] >> Starting PHP-FPM in foreground..."
+echo "[WORDPRESS] >> Starting PHP-FPM server in foreground..."
+echo "[WORDPRESS] >> Listening on port $PHP_FPM_PORT"
+echo "[WORDPRESS] >> Current Bash PID: $$"
 
-# -F keeps PHP-FPM in the foreground, exec replaces this Bash script with PHP-FPM, making PHP-FPM PID 1 inside the container.
 exec php-fpm8.2 -F
