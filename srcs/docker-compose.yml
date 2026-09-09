@@ -61,6 +61,7 @@ services:
       - .env
     depends_on:
       - wordpress
+      - adminer
     restart: on-failure
 
   ftp:
@@ -96,6 +97,21 @@ services:
       - inception
     expose:
       - "6379"
+    restart: on-failure
+
+  adminer:
+    build:
+      context: ./requirements/bonus/adminer
+      dockerfile: Dockerfile
+    image: adminer
+    pull_policy: never
+    container_name: adminer
+    networks:
+      - inception
+    expose:
+      - "8080"
+    depends_on:
+      - mariadb
     restart: on-failure
 
 networks:
