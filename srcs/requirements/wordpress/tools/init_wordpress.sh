@@ -18,7 +18,7 @@ else
     exit 1
 fi
 
-# build the complete HTTPS URL used by WordPress.
+# Build the complete HTTPS URL used by WordPress
 WP_FULL_URL="https://${DOMAIN_NAME}"
 
 mkdir -p "$WORDPRESS_DIR"
@@ -86,10 +86,15 @@ else
     echo "[WORDPRESS] >> Existing wp-config.php! Skip reinstalling WordPress and recreating users!"
 fi
 
+echo "[WORDPRESS] >> Updating WordPress URL. WordPress URL: $WP_FULL_URL"
+wp option update home "$WP_FULL_URL" --allow-root
+wp option update siteurl "$WP_FULL_URL" --allow-root
+
 echo "[WORDPRESS] >> Updating WordPress file ownership..."
 chown -R www-data:www-data "$WORDPRESS_DIR"
 
 echo "[WORDPRESS] >> Starting PHP-FPM server in foreground..."
+echo "[WORDPRESS] >> Listening on port $PHP_FPM_PORT"
 echo "[WORDPRESS] >> Current Bash PID: $$"
 
 exec php-fpm8.2 -F

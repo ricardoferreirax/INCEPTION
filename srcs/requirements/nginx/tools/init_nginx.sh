@@ -21,7 +21,6 @@ else
 fi
 
 echo "[NGINX] >> Creating NGINX configuration file..."
-# PHP requests are forwarded to PHP-FPM inside the WordPress container.
 cat > "$NGINX_CONFIG_FILE" << EOF
 server
 {
@@ -52,7 +51,9 @@ server
 }
 EOF
 echo "[NGINX] >> NGINX configuration created successfully."
+
 echo "[NGINX] >> Server name: $DOMAIN_NAME"
+echo "[NGINX] >> PHP-FPM upstream: wordpress:$PHP_FPM_PORT"
 
 echo "[NGINX] >> Testing NGINX configuration..."
 nginx -t
