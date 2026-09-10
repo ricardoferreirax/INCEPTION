@@ -44,6 +44,11 @@ server
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         fastcgi_param HTTPS on;
     }
+	location /static/
+	{
+	    proxy_pass https://static/;
+	    proxy_ssl_verify off;
+	}
     location /adminer/
     {
         proxy_pass http://adminer:8080/;

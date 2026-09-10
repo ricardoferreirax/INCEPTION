@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Inception</title>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <header>
+        <h1>INCEPTION</h1>
+        <p>42 Lisboa - System Administration Project</p>
+    </header>
+
+    <main>
+
+        <section>
+            <h2>What is Inception?</h2>
+
+            <p>
+                Inception is a project from 42 focused on Docker,
+                containers and system administration.
+            </p>
+
+            <p>
+                The goal is to create an infrastructure where each
+                service runs inside its own Docker container.
+            </p>
+        </section>
+
+
+        <section>
+            <h2>Our Infrastructure</h2>
+
+            <div class="services">
+
+                <div class="card">
+                    <h3>NGINX</h3>
+                    <p>Handles HTTPS connections.</p>
+                </div>
+
+                <div class="card">
+                    <h3>WordPress</h3>
+                    <p>Runs the website using PHP-FPM.</p>
+                </div>
+
+                <div class="card">
+                    <h3>MariaDB</h3>
+                    <p>Stores the WordPress database.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Redis</h3>
+                    <p>Provides caching for WordPress.</p>
+                </div>
+
+                <div class="card">
+                    <h3>Adminer</h3>
+                    <p>Allows database administration.</p>
+                </div>
+
+                <div class="card">
+                    <h3>FTP</h3>
+                    <p>Provides access to WordPress files.</p>
+                </div>
+
+            </div>
+        </section>
+
+
+        <section>
+            <h2>Docker Architecture</h2>
+
+            <p>
+                All services communicate through a Docker network.
+            </p>
+
+            <button onclick="showArchitecture()">
+                Show Architecture
+            </button>
+
+            <div id="architecture">
+                <p>
+                    User → NGINX → WordPress → MariaDB
+                </p>
+
+                <p>
+                    WordPress → Redis
+                </p>
+            </div>
+        </section>
+
+    </main>
+
+
+    <footer>
+        <p>Inception - rmedeiro - 42 Lisboa</p>
+    </footer>
+
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>

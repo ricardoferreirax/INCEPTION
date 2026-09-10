@@ -112,6 +112,19 @@ services:
       - mariadb
     restart: on-failure
 
+  static:
+    build:
+      context: ./requirements/bonus/static
+      dockerfile: Dockerfile
+    image: static
+    pull_policy: never
+    container_name: static
+    networks:
+      - inception
+    expose:
+      - "443"
+    restart: on-failure
+
 networks:
 
   inception:
