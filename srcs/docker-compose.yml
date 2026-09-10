@@ -56,7 +56,7 @@ services:
     networks:
       - inception
     ports:
-      - "443:443"
+      - "${NGINX_PORT}:${NGINX_PORT}"
     env_file:
       - .env
     depends_on:
@@ -95,8 +95,6 @@ services:
     container_name: redis
     networks:
       - inception
-    expose:
-      - "6379"
     restart: on-failure
 
   adminer:
