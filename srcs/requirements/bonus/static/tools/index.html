@@ -3,107 +3,99 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Inception</title>
-
-    <link rel="stylesheet" href="styles.css">
 </head>
 
-<body>
+<body style="
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #121212;
+    color: white;
+">
 
-    <header>
-        <h1>INCEPTION</h1>
+    <header style="
+        text-align: center;
+        padding: 40px;
+        background-color: #1e1e1e;
+    ">
+        <h1 style="color: #00babc;">
+            INCEPTION
+        </h1>
+
         <p>42 Lisboa - System Administration Project</p>
     </header>
 
-    <main>
 
-        <section>
-            <h2>What is Inception?</h2>
+    <main style="
+        width: 80%;
+        margin: 40px auto;
+    ">
 
-            <p>
-                Inception is a project from 42 focused on Docker,
-                containers and system administration.
-            </p>
+        <h2 style="color: #00babc;">
+            What is Inception?
+        </h2>
 
-            <p>
-                The goal is to create an infrastructure where each
-                service runs inside its own Docker container.
-            </p>
-        </section>
+        <p>
+            Inception is a 42 project about Docker and system administration.
+        </p>
 
-
-        <section>
-            <h2>Our Infrastructure</h2>
-
-            <div class="services">
-
-                <div class="card">
-                    <h3>NGINX</h3>
-                    <p>Handles HTTPS connections.</p>
-                </div>
-
-                <div class="card">
-                    <h3>WordPress</h3>
-                    <p>Runs the website using PHP-FPM.</p>
-                </div>
-
-                <div class="card">
-                    <h3>MariaDB</h3>
-                    <p>Stores the WordPress database.</p>
-                </div>
-
-                <div class="card">
-                    <h3>Redis</h3>
-                    <p>Provides caching for WordPress.</p>
-                </div>
-
-                <div class="card">
-                    <h3>Adminer</h3>
-                    <p>Allows database administration.</p>
-                </div>
-
-                <div class="card">
-                    <h3>FTP</h3>
-                    <p>Provides access to WordPress files.</p>
-                </div>
-
-            </div>
-        </section>
+        <p>
+            The goal is to create an infrastructure where each service
+            runs inside its own Docker container.
+        </p>
 
 
-        <section>
-            <h2>Docker Architecture</h2>
+        <h2 style="color: #00babc;">
+            Services
+        </h2>
 
-            <p>
-                All services communicate through a Docker network.
-            </p>
+        <div style="
+            background-color: #1e1e1e;
+            padding: 20px;
+        ">
+            <h3>NGINX</h3>
+            <p>Handles secure HTTPS connections.</p>
 
-            <button onclick="showArchitecture()">
-                Show Architecture
-            </button>
+            <h3>WordPress</h3>
+            <p>Runs the main website using PHP-FPM.</p>
 
-            <div id="architecture">
-                <p>
-                    User → NGINX → WordPress → MariaDB
-                </p>
+            <h3>MariaDB</h3>
+            <p>Stores the WordPress database.</p>
 
-                <p>
-                    WordPress → Redis
-                </p>
-            </div>
-        </section>
+            <h3>Redis</h3>
+            <p>Provides caching for WordPress.</p>
+
+            <h3>Adminer</h3>
+            <p>Provides access to the MariaDB database.</p>
+
+            <h3>FTP</h3>
+            <p>Provides access to the WordPress files.</p>
+        </div>
+
+
+        <h2 style="color: #00babc;">
+            Architecture
+        </h2>
+
+        <div style="
+            background-color: #1e1e1e;
+            padding: 20px;
+            border-left: 4px solid #00babc;
+        ">
+            <p>Client → NGINX → WordPress → MariaDB</p>
+            <p>WordPress → Redis</p>
+        </div>
 
     </main>
 
 
-    <footer>
+    <footer style="
+        text-align: center;
+        padding: 20px;
+        background-color: #1e1e1e;
+    ">
         <p>Inception - rmedeiro - 42 Lisboa</p>
     </footer>
-
-
-    <script src="script.js"></script>
 
 </body>
 
