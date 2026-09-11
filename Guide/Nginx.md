@@ -626,6 +626,7 @@ Full dependency chain:
 NGINX needs OpenSSL-generated certificate files to serve securely over HTTPS. The flow becomes:
 
 > Browser  ----- HTTPS / TLS ---> NGINX ----- FastCGI ----> WordPress / PHP-FPM ---- SQL ---> MariaDB
+> 
 
 OpenSSL does not serve the website. NGINX serves the website.
 
