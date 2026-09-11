@@ -167,6 +167,7 @@ NGINX receives this request and checks its configuration. The request contains i
 * Server configuration
 * Authentication data
 
+
 Then it decides what to do.
 
 NGINX can:
@@ -256,6 +257,7 @@ main.js
 favicon.ico
 ```
 These files physically exist inside the filesystem. NGINX can serve static files directly from the filesystem. 
+
 
 The easiest requests are ``static requests``. Static means: ``The file already exists. No code needs to run. No database query is needed``.
 
