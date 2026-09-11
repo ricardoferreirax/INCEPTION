@@ -644,6 +644,7 @@ This instruction defines the base image from which the NGINX image will be built
 
 Instead of using the official NGINX image ``FROM nginx``, the project starts from ``FROM debian:bookworm``. This means the container starts from Debian 12, also known as Bookworm. Debian provides the basic Linux environment required to install and run NGINX. It provides:
 
+
 * a Linux filesystem hierarchy;
 * the apt package manager;
 * basic shell utilities;
