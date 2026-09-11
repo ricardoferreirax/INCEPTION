@@ -777,6 +777,7 @@ Without TLS, the browser would communicate with the server using plain HTTP, whe
 
 With TLS, the data is encrypted before travelling through the network.
 
+
 TLS provides three important security properties:
 
 * ``Encryption`` means transforming readable data into unreadable data before sending it through the network. Someone looking at the encrypted traffic cannot easily understand the original content. Only the browser and NGINX can understand the communication because they establish shared encryption keys during the TLS handshake. For a WordPress website, encryption is important because requests may contain login credentials, administrator actions, form submissions and personal data. Without TLS, that data could travel as readable text. With TLS, it is protected while travelling between the browser and NGINX.
