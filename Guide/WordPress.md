@@ -600,6 +600,7 @@ Examples:
 Without php-mysql, PHP would not have the necessary database driver. WordPress PHP code could execute, but it could might failt and not connect to the database. That would make WordPress unusable because almost all WordPress content is stored in MariaDB.
 A typical error would be:
 
+
 > Your PHP installation appears to be missing the MySQL extension which is required by WordPress.
 
 So php-mysql is not optional. It is essential.
