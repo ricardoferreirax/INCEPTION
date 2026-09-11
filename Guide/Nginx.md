@@ -729,6 +729,7 @@ After installation, the image contains the NGINX binary, default configuration d
 
 In this project, NGINX is responsible for receiving the browser request and forwarding it to the correct internal service. The NGINX package gives the container the ability to:
 
+
 * open and listening on port 443;
 * accept HTTPS connections;
 * using the SSL certificate and private key;
