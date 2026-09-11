@@ -533,6 +533,7 @@ These settings control how many PHP worker processes may exist.
 
 NGINX is a web server. It is very good at:
 
+
 * receiving HTTP/HTTPS requests;
 * serving static files;
 * handling many connections efficiently;
