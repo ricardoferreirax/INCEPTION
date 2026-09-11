@@ -404,6 +404,7 @@ A simplified view is:
 
 ## What Is a Runtime Dependency?
 
+
 A runtime dependency is software that an application needs while it is running. For example, WordPress needs PHP while it is running because WordPress is written in PHP. Therefore PHP-FPM is a runtime dependency.
 
 WordPress also needs to connect to MariaDB while it is running. Therefore the PHP MySQL/MariaDB extension is a runtime dependency.
