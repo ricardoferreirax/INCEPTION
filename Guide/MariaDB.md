@@ -428,6 +428,7 @@ They are internal tables that MariaDB needs to operate.
 They are stored inside: ``/var/lib/mysql/mysql``.
 This internal database contains information such as:
 
+
 * users;
 * passwords;
 * authentication plugins;
@@ -444,6 +445,7 @@ For example, when a user tries to connect, MariaDB must check:
 
 That information comes from internal system tables.
 Without these tables, MariaDB would not know:
+
 
 * who can connect;
 * which databases exist;
