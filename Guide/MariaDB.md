@@ -722,6 +722,7 @@ By assigning ownership, MariaDB gains permission to manage its own files.
 
 So, this is necessary because MariaDB does not run as root. It runs as the mysql user.
 
+
 If /var/lib/mysql belonged only to root, then the MariaDB process running as mysql would not be able to write
 database files, create tables, update logs, or modify internal metadata. 
 
