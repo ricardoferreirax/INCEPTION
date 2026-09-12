@@ -676,6 +676,7 @@ This avoids network overhead.
 
 ## mysqld.pid
 
+
 This file stores the process ID of the running MariaDB server.
 
 Other programs can read this file to know which process belongs to MariaDB.
