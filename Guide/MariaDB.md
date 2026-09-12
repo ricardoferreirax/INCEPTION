@@ -954,6 +954,7 @@ It must know: ``What process should start first?``
 
 Every container needs an initial command. Without that command, Docker would create the container and immediately stop it because there would be no process keeping it alive. This is exactly what ``ENTRYPOINT`` defines.
 
+
 Whenever Docker starts the MariaDB container from this image: 
 
 Image -> Create Container -> Start Container -> Execute ENTRYPOINT -> Container Initialization Begins 
