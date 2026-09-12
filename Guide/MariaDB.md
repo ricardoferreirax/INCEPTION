@@ -479,6 +479,7 @@ The goal is to reduce the final Docker image size and avoid keeping unnecessary 
 
 Smaller Docker images are better because they:
 
+
 * take less disk space;
 * build faster;
 * transfer faster;
