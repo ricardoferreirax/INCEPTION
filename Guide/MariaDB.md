@@ -1045,6 +1045,7 @@ As shell launches other programs, those programs become child processes.
 
 The same happens here. The script remains the parent and MariaDB becomes the child.
 
+
 So,  with ``exec`` command, this not happens. Does not create a child process. Instead, the shell process is replaced with MariaDB server process. 
 
 The process transformation becomes:
