@@ -1054,6 +1054,7 @@ So,  with ``exec`` command, this not happens. Does not create a child process. I
 
 The process transformation becomes:
 
+
 Before: PID 1 -> init_mariadb.sh
 
 After: PID 1 -> mariadbd
