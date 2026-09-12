@@ -23,6 +23,7 @@ ENTRYPOINT ["init_mariadb.sh"]
 
 # Introduction
 
+
 This Dockerfile builds the custom MariaDB image used by the MariaDB service in the Inception project.
 
 To fully understand what this Dockerfile does, it is important to first understand what problem MariaDB solves and why a database server is required in a modern web application.
