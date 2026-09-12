@@ -152,6 +152,7 @@ Configuration files are usually stored inside: ``/etc/mysql``.
 
 Temporary runtime files are stored inside: ``/run/mysqld``.
 
+
 One of Docker's most important features is filesystem isolation.
 When Docker starts a container, it creates a separate filesystem for that container.
 
