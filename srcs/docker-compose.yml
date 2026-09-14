@@ -41,7 +41,6 @@ services:
       - wp_user_password
     depends_on:
       - mariadb
-      - redis
     restart: on-failure
 
   nginx:
@@ -59,29 +58,6 @@ services:
       - "${NGINX_PORT}:${NGINX_PORT}"
     env_file:
       - .env
-    depends_on:
-      - wordpress
-      - adminer
-    restart: on-failure
-
-  ftp:
-    build:
-      context: ./requirements/bonus/ftp
-      dockerfile: Dockerfile
-    image: ftp
-    pull_policy: never
-    container_name: ftp
-    volumes:
-      - wordpress:/var/www/html
-    networks:
-      - inception
-    ports:
-      - "21:21"
-      - "40000-40010:40000-40010"
-    env_file:
-      - .env
-    secrets:
-      - ftp_password
     depends_on:
       - wordpress
     restart: on-failure
@@ -112,6 +88,28 @@ services:
       - mariadb
     restart: on-failure
 
+  ftp:
+    build:
+      context: ./requirements/bonus/ftp
+      dockerfile: Dockerfile
+    image: ftp
+    pull_policy: never
+    container_name: ftp
+    volumes:
+      - wordpress:/var/www/html
+    networks:
+      - inception
+    ports:
+      - "21:21"
+      - "40000-40010:40000-40010"
+    env_file:
+      - .env
+    secrets:
+      - ftp_password
+    depends_on:
+      - wordpress
+    restart: on-failure
+
   static:
     build:
       context: ./requirements/bonus/static
@@ -126,12 +124,10 @@ services:
     restart: on-failure
 
 networks:
-
   inception:
     driver: bridge
 
 volumes:
-
   mariadb:
     name: mariadb
     driver: local
@@ -148,9 +144,7 @@ volumes:
       o: bind
       device: ${DATA_PATH}/wordpress
 
-
 secrets:
-
   db_root_password:
     file: ../secrets/db_root_password.txt
   db_password:
@@ -161,3 +155,4 @@ secrets:
     file: ../secrets/wp_user_password.txt
   ftp_password:
     file: ../secrets/ftp_password.txt
+  

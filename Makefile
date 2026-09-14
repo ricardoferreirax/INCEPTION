@@ -6,7 +6,7 @@
 #    By: rmedeiro <rmedeiro@student.42lisboa.com    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/06/05 22:53:35 by rmedeiro          #+#    #+#              #
-#    Updated: 2026/09/14 10:23:15 by rmedeiro         ###   ########.fr        #
+#    Updated: 2026/09/14 13:26:28 by rmedeiro         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -26,12 +26,12 @@ build:
 mandatory:
 	mkdir -p $(MDB_DIR)
 	mkdir -p $(WP_DIR)
-	$(COMPOSE) up -d --build mariadb wordpress nginx
+	BONUS_MODE=0 $(COMPOSE) up -d --build mariadb wordpress nginx
 
 bonus:
 	mkdir -p $(MDB_DIR)
 	mkdir -p $(WP_DIR)
-	$(COMPOSE) up -d --build
+	BONUS_MODE=1 $(COMPOSE) up -d --build
 
 stop:
 	$(COMPOSE) stop
