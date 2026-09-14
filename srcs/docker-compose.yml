@@ -58,6 +58,8 @@ services:
       - "${NGINX_PORT}:${NGINX_PORT}"
     env_file:
       - .env
+    environment:
+      BONUS_MODE: ${BONUS_MODE:-0}
     depends_on:
       - wordpress
     restart: on-failure
