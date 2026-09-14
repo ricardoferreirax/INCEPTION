@@ -21,27 +21,29 @@ services:
     restart: on-failure
 
   wordpress:
-    build:
-      context: ./requirements/wordpress
-      dockerfile: Dockerfile
-    image: wordpress
-    pull_policy: never
-    container_name: wordpress
-    volumes:
-      - wordpress:/var/www/html
-    networks:
-      - inception
-    expose:
-      - "${PHP_FPM_PORT}"
-    env_file:
-      - .env
-    secrets:
-      - db_password
-      - wp_admin_password
-      - wp_user_password
-    depends_on:
-      - mariadb
-    restart: on-failure
+   build:
+     context: ./requirements/wordpress
+     dockerfile: Dockerfile
+   image: wordpress
+   pull_policy: never
+   container_name: wordpress
+   volumes:
+     - wordpress:/var/www/html
+   networks:
+     - inception
+   expose:
+     - "${PHP_FPM_PORT}"
+   env_file:
+     - .env
+   environment:
+     BONUS_MODE: ${BONUS_MODE:-0}
+   secrets:
+     - db_password
+     - wp_admin_password
+     - wp_user_password
+   depends_on:
+     - mariadb
+   restart: on-failure
 
   nginx:
     build:

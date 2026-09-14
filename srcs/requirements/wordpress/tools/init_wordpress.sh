@@ -18,7 +18,7 @@ else
     exit 1
 fi
 
-# Build the complete HTTPS URL used by WordPress
+# build the complete HTTPS URL used by WordPress.
 WP_FULL_URL="https://${DOMAIN_NAME}"
 
 mkdir -p "$WORDPRESS_DIR"
@@ -50,6 +50,7 @@ cd "$WORDPRESS_DIR"
 echo "[WORDPRESS] >> Waiting for MariaDB connection..."
 MARIADB_READY=0
 for i in {1..10}; do
+
     # SELECT 1 verifies that MariaDB is running and that the WordPress database credentials work.
     if mariadb -h mariadb -P "$MDB_PORT" -u "$MDB_USER" -p"$DB_PASSWORD" "$MDB_DATABASE" -e "SELECT 1" >/dev/null 2>&1
     then
@@ -57,6 +58,7 @@ for i in {1..10}; do
         echo "[WORDPRESS] >> MariaDB connection established."
         break
     fi
+	
     echo "[WORDPRESS] >> Waiting for MariaDB to be ready..."
     sleep 2
 done
@@ -66,9 +68,10 @@ if [ "$MARIADB_READY" -ne 1 ]; then
     exit 1
 fi
 
-# install WordPress only if wp-config.php does not exist.
+# Install WordPress only if wp-config.php does not exist.
 if [ ! -f "$WP_CONFIG_FILE" ]; then
     echo "[WORDPRESS] >> No wp-config.php found. WordPress installation is required."
+
     echo "[WORDPRESS] >> Downloading WordPress core files..."
     wp core download --allow-root
 
@@ -84,11 +87,33 @@ if [ ! -f "$WP_CONFIG_FILE" ]; then
     echo "[WORDPRESS] >> WordPress initialization completed."
 else
     echo "[WORDPRESS] >> Existing wp-config.php! Skip reinstalling WordPress and recreating users!"
+
 fi
 
 echo "[WORDPRESS] >> Updating WordPress URL. WordPress URL: $WP_FULL_URL"
+
 wp option update home "$WP_FULL_URL" --allow-root
 wp option update siteurl "$WP_FULL_URL" --allow-root
+
+if [ "${BONUS_MODE:-0}" = "1" ]; then
+    echo "[WORDPRESS] >> Configuring Redis cache..."
+    wp config set WP_REDIS_HOST "redis" --allow-root
+    wp config set WP_REDIS_PORT 6379 --raw --allow-root
+
+    if ! wp plugin is-installed redis-cache --allow-root; then
+        echo "[WORDPRESS] >> Installing Redis Object Cache plugin..."
+        wp plugin install redis-cache --activate --allow-root
+    else
+        echo "[WORDPRESS] >> Redis Object Cache plugin already installed."
+        wp plugin activate redis-cache --allow-root >/dev/null 2>&1 || true
+    fi
+
+    echo "[WORDPRESS] >> Enabling Redis Object Cache..."
+    wp redis enable --allow-root
+else
+    echo "[WORDPRESS] >> Mandatory mode. Redis cache disabled."
+
+fi
 
 echo "[WORDPRESS] >> Updating WordPress file ownership..."
 chown -R www-data:www-data "$WORDPRESS_DIR"
