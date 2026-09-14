@@ -21,11 +21,74 @@ fi
 echo "[NGINX] >> Creating NGINX configuration file..."
 if [ "${BONUS_MODE:-0}" = "1" ]; then
     echo "[NGINX] >> Using bonus configuration."
-    cp /tmp/server-bonus.conf "$NGINX_CONFIG_FILE"
+    cat > "$NGINX_CONFIG_FILE" << EOF
+server
+{
+    listen ${NGINX_PORT} ssl;
+    listen [::]:${NGINX_PORT} ssl;
+    server_name ${DOMAIN_NAME};
+    root /var/www/html;
+    index index.php index.html;
+    ssl_certificate ${NGINX_SSL_CERT};
+    ssl_certificate_key ${NGINX_SSL_KEY};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    location /
+    {
+        try_files \$uri \$uri/ /index.php?\$args;
+    }
+    location ~ \.php$
+    {
+        include fastcgi_params;
+        fastcgi_pass wordpress:${PHP_FPM_PORT};
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param HTTPS on;
+    }
+    location /static/
+    {
+        proxy_pass https://static/;
+        proxy_ssl_verify off;
+    }
+    location /adminer/
+    {
+        proxy_pass http://adminer:8080/;
+    }
+}
+EOF
+
 else
     echo "[NGINX] >> Using mandatory configuration."
-    cp /tmp/server.conf "$NGINX_CONFIG_FILE"
+    cat > "$NGINX_CONFIG_FILE" << EOF
+server
+{
+    listen ${NGINX_PORT} ssl;
+    listen [::]:${NGINX_PORT} ssl;
+    server_name ${DOMAIN_NAME};
+    root /var/www/html;
+    index index.php index.html;
+    ssl_certificate ${NGINX_SSL_CERT};
+    ssl_certificate_key ${NGINX_SSL_KEY};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    location /
+    {
+        try_files \$uri \$uri/ /index.php?\$args;
+    }
+    location ~ \.php$
+    {
+        include fastcgi_params;
+        fastcgi_pass wordpress:${PHP_FPM_PORT};
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param HTTPS on;
+    }
+}
+EOF
+
 fi
+
+echo "[NGINX] >> NGINX configuration created successfully."
+echo "[NGINX] >> Server name: ${DOMAIN_NAME}"
+echo "[NGINX] >> NGINX port: ${NGINX_PORT}"
 
 echo "[NGINX] >> Testing NGINX configuration..."
 nginx -t
