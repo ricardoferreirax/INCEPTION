@@ -6,43 +6,32 @@
 #    By: rmedeiro <rmedeiro@student.42lisboa.com    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/06/05 22:53:35 by rmedeiro          #+#    #+#              #
-#    Updated: 2026/06/21 23:10:01 by rmedeiro         ###   ########.fr        #
+#    Updated: 2026/09/14 10:23:15 by rmedeiro         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
 NAME = inception
 
-COMPOSE	= docker compose -f srcs/docker-compose.yml
+COMPOSE = docker compose -f srcs/docker-compose.yml
 
 DATA_DIR = /home/$(USER)/data
-MDB_DIR	= $(DATA_DIR)/mariadb
+MDB_DIR = $(DATA_DIR)/mariadb
 WP_DIR = $(DATA_DIR)/wordpress
 
-all: up
+all: mandatory
 
 build:
 	$(COMPOSE) build
 
-no-cache:
-	$(COMPOSE) build --no-cache
+mandatory:
+	mkdir -p $(MDB_DIR)
+	mkdir -p $(WP_DIR)
+	$(COMPOSE) up -d --build mariadb wordpress nginx
 
-up: 
+bonus:
 	mkdir -p $(MDB_DIR)
 	mkdir -p $(WP_DIR)
 	$(COMPOSE) up -d --build
-
-db: 
-	mkdir -p $(MDB_DIR)
-	mkdir -p $(WP_DIR)
-	$(COMPOSE) up -d --build mariadb
-
-ftp:
-	mkdir -p $(MDB_DIR)
-	mkdir -p $(WP_DIR)
-	$(COMPOSE) up -d --build ftp
-
-down:
-	$(COMPOSE) down
 
 stop:
 	$(COMPOSE) stop
@@ -54,11 +43,12 @@ logs:
 	$(COMPOSE) logs -f
 
 clean:
-	$(COMPOSE) down -v
+	$(COMPOSE) down
 
 fclean: clean
+	$(COMPOSE) down -v
 	sudo rm -rf $(DATA_DIR)
 
-re: fclean up
+re: fclean mandatory
 
-.PHONY: all dirs build no-cache up db down stop start clean fclean re
+.PHONY: all build mandatory bonus stop start logs clean fclean re
