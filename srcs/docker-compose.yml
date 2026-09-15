@@ -5,7 +5,6 @@ services:
       context: ./requirements/mariadb
       dockerfile: Dockerfile
     image: mariadb
-    pull_policy: never
     container_name: mariadb
     volumes:
       - mariadb:/var/lib/mysql
@@ -18,39 +17,37 @@ services:
     secrets:
       - db_root_password
       - db_password
-    restart: on-failure
+    restart: always
 
   wordpress:
-   build:
-     context: ./requirements/wordpress
-     dockerfile: Dockerfile
-   image: wordpress
-   pull_policy: never
-   container_name: wordpress
-   volumes:
-     - wordpress:/var/www/html
-   networks:
-     - inception
-   expose:
-     - "${PHP_FPM_PORT}"
-   env_file:
-     - .env
-   environment:
-     BONUS_MODE: ${BONUS_MODE:-0}
-   secrets:
-     - db_password
-     - wp_admin_password
-     - wp_user_password
-   depends_on:
-     - mariadb
-   restart: on-failure
+    build:
+      context: ./requirements/wordpress
+      dockerfile: Dockerfile
+    image: wordpress
+    container_name: wordpress
+    volumes:
+      - wordpress:/var/www/html
+    networks:
+      - inception
+    expose:
+      - "${PHP_FPM_PORT}"
+    env_file:
+      - .env
+    environment:
+      BONUS_MODE: ${BONUS_MODE:-0}
+    secrets:
+      - db_password
+      - wp_admin_password
+      - wp_user_password
+    depends_on:
+      - mariadb
+    restart: always
 
   nginx:
     build:
       context: ./requirements/nginx
       dockerfile: Dockerfile
     image: nginx
-    pull_policy: never
     container_name: nginx
     volumes:
       - wordpress:/var/www/html
@@ -64,25 +61,23 @@ services:
       BONUS_MODE: ${BONUS_MODE:-0}
     depends_on:
       - wordpress
-    restart: on-failure
+    restart: always
 
   redis:
     build:
       context: ./requirements/bonus/redis
       dockerfile: Dockerfile
     image: redis
-    pull_policy: never
     container_name: redis
     networks:
       - inception
-    restart: on-failure
+    restart: always
 
   adminer:
     build:
       context: ./requirements/bonus/adminer
       dockerfile: Dockerfile
     image: adminer
-    pull_policy: never
     container_name: adminer
     networks:
       - inception
@@ -90,14 +85,13 @@ services:
       - "8080"
     depends_on:
       - mariadb
-    restart: on-failure
+    restart: always
 
   ftp:
     build:
       context: ./requirements/bonus/ftp
       dockerfile: Dockerfile
     image: ftp
-    pull_policy: never
     container_name: ftp
     volumes:
       - wordpress:/var/www/html
@@ -112,20 +106,19 @@ services:
       - ftp_password
     depends_on:
       - wordpress
-    restart: on-failure
+    restart: always
 
   static:
     build:
       context: ./requirements/bonus/static
       dockerfile: Dockerfile
     image: static
-    pull_policy: never
     container_name: static
     networks:
       - inception
     expose:
       - "443"
-    restart: on-failure
+    restart: always
 
 networks:
   inception:
@@ -135,18 +128,9 @@ volumes:
   mariadb:
     name: mariadb
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_PATH}/mariadb
-
   wordpress:
     name: wordpress
     driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_PATH}/wordpress
 
 secrets:
   db_root_password:
@@ -159,4 +143,3 @@ secrets:
     file: ../secrets/wp_user_password.txt
   ftp_password:
     file: ../secrets/ftp_password.txt
-  
