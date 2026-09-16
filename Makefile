@@ -5,18 +5,8 @@
 #                                                     +:+ +:+         +:+      #
 #    By: rmedeiro <rmedeiro@student.42lisboa.com    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
-#    Created: 2026/06/05 22:53:35 by rmedeiro          #+#    #+#              #
-#    Updated: 2026/09/15 14:23:49 by rmedeiro         ###   ########.fr        #
-#                                                                              #
-# **************************************************************************** #
-
-# **************************************************************************** #
-#                                                                              #
-#                                                         :::      ::::::::    #
-#    Makefile                                           :+:      :+:    :+:    #
-#                                                     +:+ +:+         +:+      #
-#    By: rmedeiro <rmedeiro@student.42lisboa.com>    +#+  +:+       +#+         #
-#                                                 +#+#+#+#+#+   +#+            #
+#    Created: 2026/09/16 23:11:16 by rmedeiro          #+#    #+#              #
+#    Updated: 2026/09/16 23:14:29 by rmedeiro         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -24,21 +14,37 @@ NAME = inception
 
 COMPOSE = docker compose -f srcs/docker-compose.yml
 
-all: mandatory
+DATA_DIR = /home/$(USER)/data
+MDB_DIR = $(DATA_DIR)/mariadb
+WP_DIR = $(DATA_DIR)/wordpress
+
+MANDATORY = mariadb wordpress nginx
+
+all: base
 
 build:
 	$(COMPOSE) build
 
-mandatory:
-	BONUS_MODE=0 $(COMPOSE) up -d --build mariadb wordpress nginx
+base:
+	mkdir -p $(MDB_DIR)
+	mkdir -p $(WP_DIR)
+	$(COMPOSE) up -d --build $(MANDATORY)
 
 bonus:
-	BONUS_MODE=1 $(COMPOSE) up -d --build
+	mkdir -p $(MDB_DIR)
+	mkdir -p $(WP_DIR)
+	$(COMPOSE) up -d --build
 
-stop:
+stop-base:
+	$(COMPOSE) stop $(MANDATORY)
+
+start-base:
+	$(COMPOSE) start $(MANDATORY)
+
+stop-bonus:
 	$(COMPOSE) stop
 
-start:
+start-bonus:
 	$(COMPOSE) start
 
 logs:
@@ -47,9 +53,10 @@ logs:
 clean:
 	$(COMPOSE) down
 
-fclean:
+fclean: clean
 	$(COMPOSE) down -v
+	sudo rm -rf $(DATA_DIR)
 
-re: fclean mandatory
+re: fclean base
 
-.PHONY: all build mandatory bonus stop start logs clean fclean re
+.PHONY: all build base bonus stop-base start-base stop-bonus start-bonus logs clean fclean re
