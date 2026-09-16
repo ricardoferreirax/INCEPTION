@@ -18,10 +18,12 @@ else
     exit 1
 fi
 
+# create the runtime dir for mariadb socket and dir where mariadb store its database files
 mkdir -p "$MARIADB_RUN_DIR"
 mkdir -p "$MARIADB_DATA_DIR"
 mkdir -p "$MARIADB_CONFIG_DIR"
 
+# allow the mysql user to manage the runtime and database files.
 chown -R mysql:mysql "$MARIADB_RUN_DIR" "$MARIADB_DATA_DIR"
 
 echo "[MARIADB] >> Creating MariaDB configuration file..."
@@ -76,12 +78,11 @@ EOF
 
     echo "[MARIADB] >> Creating MariaDB initialization marker..."
     touch "$MARIADB_INIT_FILE"
-
+	# give mariadb ownership of the initialization marker so that it can be removed later if needed
     chown mysql:mysql "$MARIADB_INIT_FILE"
 
     echo "[MARIADB] >> Stopping temporary MariaDB server..."
     mariadb-admin --socket="$MARIADB_SOCKET" -u root -p"${DB_ROOT_PASSWORD}" shutdown
-
     # Wait til the temporary server process has fully exited before starting the permanent MariaDB process.
     wait "$MARIADB_PID" || true
 
@@ -90,5 +91,4 @@ fi
 
 echo "[MARIADB] >> Starting MariaDB server in foreground..."
 echo "[MARIADB] >> Current Bash PID: $$"
-
 exec mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET" --port="$MDB_PORT"
