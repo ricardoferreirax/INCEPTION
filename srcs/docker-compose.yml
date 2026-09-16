@@ -146,6 +146,22 @@ services:
     networks:
       - inception_bridge
 
+  # Portainer provides a web interface for managing Docker.
+  portainer:
+    build:
+      context: ./requirements/bonus/portainer
+      dockerfile: Dockerfile
+    image: portainer
+    container_name: portainer
+    restart: on-failure
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - inception_bridge
+    expose:
+      - "9000"
+
 volumes:
   # preserve mariadb data in the required host dir and provide a shared filesystem for mariadb and adminer servicew.
   wp_database_store:
@@ -164,6 +180,9 @@ volumes:
       type: none
       o: bind
       device: /home/${USER}/data/wordpress
+
+  portainer_data:
+    name: portainer_data
 
 # provide a private network for communication between all containers so that they can communicate without exposing ports to host.
 networks:
