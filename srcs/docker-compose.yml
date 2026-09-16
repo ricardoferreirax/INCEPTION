@@ -1,136 +1,174 @@
 services:
 
+  # mariadb stores the persistent db used by wp and is only reachable by containers connected to private Inception network.
   mariadb:
     build:
       context: ./requirements/mariadb
       dockerfile: Dockerfile
     image: mariadb
     container_name: mariadb
-    volumes:
-      - mariadb:/var/lib/mysql
-    networks:
-      - inception
-    expose:
-      - "${MDB_PORT}"
+    # restart the container if its main process exits unexpectedly.
+    restart: on-failure
     env_file:
       - .env
+    # mount persistent db storage at mariadb's data dir, keeping db files persistent outiside the container.
+    volumes:
+      - wp_database_store:/var/lib/mysql
+    # connect mariadb to the private bridge network without exposing the db to the host machine.
+    networks:
+      - inception_bridge
+    # expose maraidb port available only to containers inside the docker network.
+    expose:
+      - "${MDB_PORT}"
     secrets:
       - db_root_password
       - db_password
-    restart: always
 
+  # wordPress runs with php-fpm and uses mariadb as its database.
   wordpress:
     build:
       context: ./requirements/wordpress
       dockerfile: Dockerfile
     image: wordpress
     container_name: wordpress
-    volumes:
-      - wordpress:/var/www/html
-    networks:
-      - inception
-    expose:
-      - "${PHP_FPM_PORT}"
+    restart: on-failure
     env_file:
       - .env
-    environment:
-      BONUS_MODE: ${BONUS_MODE:-0}
+    # store wp files outside container filesystem and share them with nginx so it can access the website files 
+    # and with ftp so files can be transferred.
+    volumes:
+      - wp_content_store:/var/www/html
+    # connect wp to the same private network as mariadb and nginx.
+    networks:
+      - inception_bridge
+    # expose php-fpm port only to containers inside the docker network.
+    expose:
+      - "${PHP_FPM_PORT}"
     secrets:
       - db_password
       - wp_admin_password
       - wp_user_password
+    # start mariadb before wordpress because wordpress needs its database. 
     depends_on:
       - mariadb
-    restart: always
 
+  # nginx is the https entrypoint and it serves website and forwards php requests to wordpress/php-fpm.
   nginx:
     build:
       context: ./requirements/nginx
       dockerfile: Dockerfile
     image: nginx
     container_name: nginx
-    volumes:
-      - wordpress:/var/www/html
-    networks:
-      - inception
+    restart: on-failure
+    # publish https port so the website can be accessed from the host
     ports:
       - "${NGINX_PORT}:${NGINX_PORT}"
+    # share persistent wp files with nginx so static files can be served without creating a second copy of the website.
+    volumes:
+      - wp_content_store:/var/www/html
+    # connect nginx to the same private bridge as the internal services.
+    networks:
+      - inception_bridge
     env_file:
       - .env
-    environment:
-      BONUS_MODE: ${BONUS_MODE:-0}
+    # start wp before nginx because nginx forwards php requests to php-fpm process running inside the wp container.
     depends_on:
       - wordpress
-    restart: always
 
+  # redis provides an in-memory object cache for wp.
   redis:
     build:
       context: ./requirements/bonus/redis
       dockerfile: Dockerfile
     image: redis
     container_name: redis
+    restart: on-failure
+    # keep redis internal private because only wp needs to access it.
     networks:
-      - inception
-    restart: always
+      - inception_bridge
 
+  # adminer provides a web interface for managing mariadb database
   adminer:
     build:
       context: ./requirements/bonus/adminer
       dockerfile: Dockerfile
     image: adminer
     container_name: adminer
-    networks:
-      - inception
+    restart: on-failure
+    # expose adminer's HTTP port internally inside the Docker network so nginx can proxy requests to it.
     expose:
       - "8080"
+    # connect adminer to the same network as maraidb so adminer can resolve and connect to mariadb as its database server
+    networks:
+      - inception_bridge
+    # start mariadb before adminer so adminer can connect to the database server when it starts.
     depends_on:
       - mariadb
-    restart: always
 
+  # ftp allows file transfers to and from wordpress website
   ftp:
     build:
       context: ./requirements/bonus/ftp
       dockerfile: Dockerfile
     image: ftp
     container_name: ftp
-    volumes:
-      - wordpress:/var/www/html
-    networks:
-      - inception
-    ports:
-      - "21:21"
-      - "40000-40010:40000-40010"
+    restart: on-failure
     env_file:
       - .env
     secrets:
       - ftp_password
+    # share the same persistent files used by wp so files transferred through ftp refer to same files used by wp and nginx.
+    volumes:
+      - wp_content_store:/var/www/html
+    # Attach FTP to the common private infrastructure network.
+    networks:
+      - inception_bridge
+    # publish port 21 FTP control connection and additional range is published for passive data transfer connections.
+    ports:
+      - "21:21"
+      - "40000-40010:40000-40010"
+    # start WordPress first because FTP operates on its persistent files.
     depends_on:
       - wordpress
-    restart: always
 
+  # static hosts additional static website, it remains internal and is reached externally through the main NGINX.
   static:
     build:
       context: ./requirements/bonus/static
       dockerfile: Dockerfile
     image: static
     container_name: static
-    networks:
-      - inception
+    restart: on-failure
+    # expose https internally so nginx can proxy requests to static without publishing another web port directly on the host.
     expose:
       - "443"
-    restart: always
-
-networks:
-  inception:
-    driver: bridge
+    # connect the static website to nginx through private network so NGINX can resolve the service as static.
+    networks:
+      - inception_bridge
 
 volumes:
-  mariadb:
-    name: mariadb
+  # preserve mariadb data in the required host dir and provide a shared filesystem for mariadb and adminer servicew.
+  wp_database_store:
+    name: wp_database_store
     driver: local
-  wordpress:
-    name: wordpress
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/${USER}/data/mariadb
+
+  # preserve the wp files in the required host dir and provide a shared filesystem for wp, nginx and ftp services.
+  wp_content_store:
+    name: wp_content_store
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/${USER}/data/wordpress
+
+# provide a private network for communication between all containers so that they can communicate without exposing ports to host.
+networks:
+  inception_bridge:
+    driver: bridge
 
 secrets:
   db_root_password:
