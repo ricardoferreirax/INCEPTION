@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Stop immediately if any command fails or if an undefined variable is used.
+# stop immediately if any command fails or if an undefined variable is used.
 set -eu
 
 WORDPRESS_DIR="/var/www/html"
@@ -18,13 +18,15 @@ else
     exit 1
 fi
 
-# build the complete HTTPS URL used by WordPress.
+# build the complete https url used by wordpress.
 WP_FULL_URL="https://${DOMAIN_NAME}"
 
+# create dir where wp stores its website files and runtime dir used by php-fpm.
 mkdir -p "$WORDPRESS_DIR"
 mkdir -p "$PHP_FPM_RUN_DIR"
 mkdir -p "$PHP_FPM_CONFIG_DIR"
 
+# allow the web server user to manage wordpress and php-fpm runtime files.
 chown -R www-data:www-data "$WORDPRESS_DIR" "$PHP_FPM_RUN_DIR"
 
 echo "[WORDPRESS] >> Creating PHP-FPM configuration file..."
@@ -44,21 +46,20 @@ clear_env = no
 EOF
 echo "[WORDPRESS] >> PHP-FPM configuration created successfully."
 
-# move into the WordPress directory so WP-CLI commands operate on the correct installation.
+# move into the wp dir so wp-cli uses the correct installation.
 cd "$WORDPRESS_DIR"
 
 echo "[WORDPRESS] >> Waiting for MariaDB connection..."
 MARIADB_READY=0
 for i in {1..10}; do
-
-    # SELECT 1 verifies that MariaDB is running and that the WordPress database credentials work.
+    # verify that mariadb is ready and the wp credentials work.
     if mariadb -h mariadb -P "$MDB_PORT" -u "$MDB_USER" -p"$DB_PASSWORD" "$MDB_DATABASE" -e "SELECT 1" >/dev/null 2>&1
     then
         MARIADB_READY=1
         echo "[WORDPRESS] >> MariaDB connection established."
         break
     fi
-	
+
     echo "[WORDPRESS] >> Waiting for MariaDB to be ready..."
     sleep 2
 done
@@ -68,7 +69,7 @@ if [ "$MARIADB_READY" -ne 1 ]; then
     exit 1
 fi
 
-# Install WordPress only if wp-config.php does not exist.
+# install wp only if wp-config.php does not exist.
 if [ ! -f "$WP_CONFIG_FILE" ]; then
     echo "[WORDPRESS] >> No wp-config.php found. WordPress installation is required."
 
@@ -85,21 +86,20 @@ if [ ! -f "$WP_CONFIG_FILE" ]; then
     wp user create "wpuser" "wpuser@example.com" --user_pass="$WP_USER_PASSWORD" --role="author" --allow-root
 
     echo "[WORDPRESS] >> WordPress initialization completed."
+
 else
     echo "[WORDPRESS] >> Existing wp-config.php! Skip reinstalling WordPress and recreating users!"
-
 fi
 
-echo "[WORDPRESS] >> Updating WordPress URL. WordPress URL: $WP_FULL_URL"
-
+# update the WordPress site URL and home URL to match the domain name.
 wp option update home "$WP_FULL_URL" --allow-root
 wp option update siteurl "$WP_FULL_URL" --allow-root
 
-if [ "${BONUS_MODE:-0}" = "1" ]; then
-    echo "[WORDPRESS] >> Configuring Redis cache..."
+# configure redis object cache only when the redis bonus service is available.
+if getent hosts redis >/dev/null 2>&1; then
+    echo "[WORDPRESS] >> Redis service detected. Configuring Redis cache..."
     wp config set WP_REDIS_HOST "redis" --allow-root
     wp config set WP_REDIS_PORT 6379 --raw --allow-root
-
     if ! wp plugin is-installed redis-cache --allow-root; then
         echo "[WORDPRESS] >> Installing Redis Object Cache plugin..."
         wp plugin install redis-cache --activate --allow-root
@@ -111,15 +111,14 @@ if [ "${BONUS_MODE:-0}" = "1" ]; then
     echo "[WORDPRESS] >> Enabling Redis Object Cache..."
     wp redis enable --allow-root
 else
-    echo "[WORDPRESS] >> Mandatory mode. Redis cache disabled."
-
+    echo "[WORDPRESS] >> Redis service not available. Skipping Redis cache."
 fi
 
 echo "[WORDPRESS] >> Updating WordPress file ownership..."
+
+# give the web server user ownership of all WordPress files.
 chown -R www-data:www-data "$WORDPRESS_DIR"
 
 echo "[WORDPRESS] >> Starting PHP-FPM server in foreground..."
-echo "[WORDPRESS] >> Listening on port $PHP_FPM_PORT"
 echo "[WORDPRESS] >> Current Bash PID: $$"
-
 exec php-fpm8.2 -F
