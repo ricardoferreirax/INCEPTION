@@ -9,10 +9,11 @@ NGINX_CONFIG_FILE="$NGINX_CONFIG_DIR/default.conf"
 NGINX_SSL_CERT="$NGINX_SSL_DIR/inception.crt"
 NGINX_SSL_KEY="$NGINX_SSL_DIR/inception.key"
 
-# create dir where NGINX stores its SSL files.
+# create directories where NGINX stores its SSL files and configuration.
 mkdir -p "$NGINX_SSL_DIR"
 mkdir -p "$NGINX_CONFIG_DIR"
 
+# create a self-signed SSL certificate if it does not exist.
 if [ ! -f "$NGINX_SSL_CERT" ] || [ ! -f "$NGINX_SSL_KEY" ]; then
     echo "[NGINX] >> No SSL certificate found. Creating a new certificate..."
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout "$NGINX_SSL_KEY" \
@@ -23,20 +24,7 @@ else
 fi
 
 echo "[NGINX] >> Creating NGINX configuration file..."
-# Check if the Adminer service becomes available.
-ADMINER_AVAILABLE=0
-for i in {1..5}; do
-    if getent hosts adminer >/dev/null 2>&1; then
-        ADMINER_AVAILABLE=1
-        break
-    fi
-    echo "[NGINX] >> Waiting for Adminer..."
-    sleep 1
-done
-
-if [ "$ADMINER_AVAILABLE" -eq 1 ]; then
-    echo "[NGINX] >> Adminer detected. Creating bonus configuration."
-    cat > "$NGINX_CONFIG_FILE" << EOF
+cat > "$NGINX_CONFIG_FILE" << EOF
 server
 {
     listen 443 ssl;
@@ -81,36 +69,7 @@ server
     }
 }
 EOF
-    echo "[NGINX] >> Bonus configuration created successfully."
-else
-    echo "[NGINX] >> Adminer not detected. Creating mandatory configuration."
-    cat > "$NGINX_CONFIG_FILE" << EOF
-server
-{
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    server_name ${DOMAIN_NAME};
-    root /var/www/html;
-    index index.php index.html;
-    ssl_certificate ${NGINX_SSL_CERT};
-    ssl_certificate_key ${NGINX_SSL_KEY};
-    ssl_protocols TLSv1.2 TLSv1.3;
-    location /
-    {
-        try_files \$uri \$uri/ /index.php?\$args;
-    }
-    location ~ \.php$
-    {
-        include fastcgi_params;
-        fastcgi_pass wordpress:${PHP_FPM_PORT};
-        fastcgi_index index.php;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        fastcgi_param HTTPS on;
-    }
-}
-EOF
-    echo "[NGINX] >> Mandatory configuration created successfully."
-fi
+echo "[NGINX] >> NGINX configuration created successfully."
 
 echo "[NGINX] >> Testing NGINX configuration..."
 nginx -t
