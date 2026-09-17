@@ -4,12 +4,15 @@ RUN apt-get update && apt-get install -y nginx openssl && rm -rf /var/lib/apt/li
 
 RUN mkdir -p /etc/nginx/ssl/private /etc/nginx/ssl/certs /var/www/html
 
-RUN openssl genrsa -out /etc/nginx/ssl/private/priv.key 4096 && openssl req -new -x509 -key \
-	/etc/nginx/ssl/private/priv.key -days 365 -out /etc/nginx/ssl/certs/pub.crt -subj "/CN=static.42.fr"
+RUN openssl genrsa -out /etc/nginx/ssl/private/priv.key 4096 && openssl req -new -x509 \
+    -key /etc/nginx/ssl/private/priv.key -days 365 -out /etc/nginx/ssl/certs/pub.crt \
+    -subj "/CN=static.42.fr"
 
 COPY ./conf/nginx.conf /etc/nginx/nginx.conf
 
 COPY ./tools/index.html /var/www/html/index.html
+COPY ./tools/style.css /var/www/html/style.css
+COPY ./tools/script.js /var/www/html/script.js
 
 RUN chown -R www-data:www-data /var/www/html
 
