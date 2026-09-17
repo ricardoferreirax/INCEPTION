@@ -1,20 +1,19 @@
 services:
 
-  # mariadb stores the persistent db used by wp and is only reachable by containers connected to private Inception network.
+  # mariadb stores persistent db used by wp and is only reachable by containers connected to private Inception network.
   mariadb:
     build:
       context: ./requirements/mariadb
       dockerfile: Dockerfile
     image: mariadb
     container_name: mariadb
-    # restart the container if its main process exits unexpectedly.
     restart: on-failure
     env_file:
       - .env
     # mount persistent db storage at mariadb's data dir, keeping db files persistent outiside the container.
     volumes:
       - wp_database_store:/var/lib/mysql
-    # connect mariadb to the private bridge network without exposing the db to the host machine.
+    # connect mariadb to private bridge network without exposing the db to the host machine.
     networks:
       - inception_bridge
     # expose maraidb port available only to containers inside the docker network.
@@ -35,7 +34,6 @@ services:
     env_file:
       - .env
     # store wp files outside container filesystem and share them with nginx so it can access the website files 
-    # and with ftp so files can be transferred.
     volumes:
       - wp_content_store:/var/www/html
     # connect wp to the same private network as mariadb and nginx.
@@ -51,6 +49,7 @@ services:
     # start mariadb before wordpress because wordpress needs its database. 
     depends_on:
       - mariadb
+      - redis
 
   # nginx is the https entrypoint and it serves website and forwards php requests to wordpress/php-fpm.
   nginx:
@@ -74,6 +73,9 @@ services:
     # start wp before nginx because nginx forwards php requests to php-fpm process running inside the wp container.
     depends_on:
       - wordpress
+      - adminer
+      - static
+      - portainer
 
   # redis provides an in-memory object cache for wp.
   redis:
@@ -156,7 +158,6 @@ services:
     restart: on-failure
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
     networks:
       - inception_bridge
     expose:
@@ -180,9 +181,6 @@ volumes:
       type: none
       o: bind
       device: /home/${USER}/data/wordpress
-
-  portainer_data:
-    name: portainer_data
 
 # provide a private network for communication between all containers so that they can communicate without exposing ports to host.
 networks:
