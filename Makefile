@@ -6,6 +6,18 @@
 #    By: rmedeiro <rmedeiro@student.42lisboa.com    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/09/16 23:11:16 by rmedeiro          #+#    #+#              #
+#    Updated: 2026/09/17 23:39:19 by rmedeiro         ###   ########.fr        #
+#                                                                              #
+# **************************************************************************** #
+
+# **************************************************************************** #
+#                                                                              #
+#                                                         :::      ::::::::    #
+#    Makefile                                           :+:      :+:    :+:    #
+#                                                     +:+ +:+         +:+      #
+#    By: rmedeiro <rmedeiro@student.42lisboa.com>     +#+  +:+       +#+         #
+#                                                 +#+#+#+#+#+   +#+            #
+#    Created: 2026/09/16 23:11:16 by rmedeiro          #+#    #+#              #
 #    Updated: 2026/09/17 21:54:50 by rmedeiro         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
@@ -15,6 +27,7 @@ COMPOSE = docker compose -f srcs/docker-compose.yml
 DATA_DIR = /home/$(USER)/data
 MDB_DIR = $(DATA_DIR)/mariadb
 WP_DIR = $(DATA_DIR)/wordpress
+PORTAINER_DIR = $(DATA_DIR)/portainer
 
 all: up
 
@@ -24,6 +37,7 @@ build:
 up:
 	mkdir -p $(MDB_DIR)
 	mkdir -p $(WP_DIR)
+	mkdir -p $(PORTAINER_DIR)
 	$(COMPOSE) up -d --build
 
 stop:

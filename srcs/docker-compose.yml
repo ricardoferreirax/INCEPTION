@@ -50,6 +50,11 @@ services:
     depends_on:
       - mariadb
       - redis
+    healthcheck:
+      test: ["CMD", "grep", "-q", "php-fpm", "/proc/1/cmdline"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
 
   # nginx is the https entrypoint and it serves website and forwards php requests to wordpress/php-fpm.
   nginx:
@@ -72,10 +77,8 @@ services:
       - .env
     # start wp before nginx because nginx forwards php requests to php-fpm process running inside the wp container.
     depends_on:
-      - wordpress
-      - adminer
-      - static
-      - portainer
+      wordpress:
+        condition: service_healthy
 
   # redis provides an in-memory object cache for wp.
   redis:
@@ -157,6 +160,7 @@ services:
     container_name: portainer
     restart: on-failure
     volumes:
+      - portainer_store:/data
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - inception_bridge
@@ -164,7 +168,6 @@ services:
       - "9000"
 
 volumes:
-  # preserve mariadb data in the required host dir and provide a shared filesystem for mariadb and adminer servicew.
   wp_database_store:
     name: wp_database_store
     driver: local
@@ -173,7 +176,6 @@ volumes:
       o: bind
       device: /home/${USER}/data/mariadb
 
-  # preserve the wp files in the required host dir and provide a shared filesystem for wp, nginx and ftp services.
   wp_content_store:
     name: wp_content_store
     driver: local
@@ -181,6 +183,14 @@ volumes:
       type: none
       o: bind
       device: /home/${USER}/data/wordpress
+
+  portainer_store:
+    name: portainer_data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/${USER}/data/portainer
 
 # provide a private network for communication between all containers so that they can communicate without exposing ports to host.
 networks:
