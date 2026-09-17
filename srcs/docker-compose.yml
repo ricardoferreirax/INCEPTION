@@ -62,7 +62,7 @@ services:
     restart: on-failure
     # publish https port so the website can be accessed from the host
     ports:
-      - "${NGINX_PORT}:${NGINX_PORT}"
+      - "443:443"
     # share persistent wp files with nginx so static files can be served without creating a second copy of the website.
     volumes:
       - wp_content_store:/var/www/html

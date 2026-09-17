@@ -6,7 +6,7 @@
 #    By: rmedeiro <rmedeiro@student.42lisboa.com    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2026/09/16 23:11:16 by rmedeiro          #+#    #+#              #
-#    Updated: 2026/09/16 23:14:29 by rmedeiro         ###   ########.fr        #
+#    Updated: 2026/09/17 00:13:21 by rmedeiro         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -58,5 +58,7 @@ fclean: clean
 	sudo rm -rf $(DATA_DIR)
 
 re: fclean base
+
+rebonus: fclean bonus
 
 .PHONY: all build base bonus stop-base start-base stop-bonus start-bonus logs clean fclean re

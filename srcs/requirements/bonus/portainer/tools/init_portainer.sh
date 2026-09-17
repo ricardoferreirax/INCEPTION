@@ -10,5 +10,4 @@ mkdir -p "$PORTAINER_DATA_DIR"
 
 echo "[PORTAINER] >> Starting Portainer in foreground..."
 echo "[PORTAINER] >> Current Bash PID: $$"
-
-exec /opt/portainer/portainer --data "$PORTAINER_DATA_DIR" --http-enabled
+exec /opt/portainer/portainer --data "$PORTAINER_DATA_DIR" --http-enabled --base-url "/portainer"
