@@ -40,17 +40,17 @@ if [ -f "$MARIADB_INIT_FILE" ]; then
     echo "[MARIADB] >> Init marker found! Skip recreating database and users!"
 else
     echo "[MARIADB] >> No initialization marker found! Database initialization is required."
-
-    echo "[MARIADB] >> Start MariaDB server temporarily in background..."
+    
+	echo "[MARIADB] >> Start MariaDB server temporarily in background..."
     mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET" --skip-networking &
+
     # save the temporary mariadb process id.
     MARIADB_PID=$!
     echo "[MARIADB] >> Temporary MariaDB PID: $MARIADB_PID"
-    # initially assume that mariadb is not ready.
     MARIADB_READY=0
     echo "[MARIADB] >> Waiting for temporary server to accept connections..."
     for i in {1..10}; do
-        # Check if MariaDB is ready to receive SQL commands.
+        # check if MariaDB is ready to receive SQL commands.
         if mariadb --socket="$MARIADB_SOCKET" -u root -e "SELECT 1" >/dev/null 2>&1
         then
             MARIADB_READY=1
@@ -74,16 +74,18 @@ GRANT ALL PRIVILEGES ON \`wordpress\`.* TO 'rmedeiro'@'%';
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}';
 FLUSH PRIVILEGES;
 EOF
-
     echo "[MARIADB] >> Database and user configuration completed successfully."
 
     echo "[MARIADB] >> Creating MariaDB initialization marker..."
     touch "$MARIADB_INIT_FILE"
-    # Give MariaDB ownership of the initialization marker.
+
+    # give MariaDB ownership of the initialization marker.
     chown mysql:mysql "$MARIADB_INIT_FILE"
+
     echo "[MARIADB] >> Stopping temporary MariaDB server..."
     mariadb-admin --socket="$MARIADB_SOCKET" -u root -p"${DB_ROOT_PASSWORD}" shutdown
-    # Wait until the temporary MariaDB process has fully exited.
+
+    # wait until the temporary MariaDB process has fully exited.
     wait "$MARIADB_PID" || true
 
     echo "[MARIADB] >> MariaDB initialization completed."

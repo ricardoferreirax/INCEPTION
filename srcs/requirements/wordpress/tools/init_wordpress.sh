@@ -46,29 +46,10 @@ clear_env = no
 EOF
 echo "[WORDPRESS] >> PHP-FPM configuration created successfully."
 
-# Move into the WordPress directory so WP-CLI uses the correct installation.
+# move into the WordPress directory so WP-CLI uses the correct installation.
 cd "$WORDPRESS_DIR"
 
-echo "[WORDPRESS] >> Waiting for MariaDB connection..."
-MARIADB_READY=0
-for i in {1..10}; do
-    # Verify that MariaDB is ready and WordPress credentials work.
-    if mariadb -h mariadb -P "$MDB_PORT" -u "rmedeiro" -p"$DB_PASSWORD" "wordpress" -e "SELECT 1" >/dev/null 2>&1
-    then
-        MARIADB_READY=1
-        echo "[WORDPRESS] >> MariaDB connection established."
-        break
-    fi
-    echo "[WORDPRESS] >> Waiting for MariaDB to be ready..."
-    sleep 2
-done
-
-if [ "$MARIADB_READY" -ne 1 ]; then
-    echo "[ERROR] >> WordPress could not connect to MariaDB."
-    exit 1
-fi
-
-# Install WordPress only if wp-config.php does not exist.
+# install WordPress only if wp-config.php does not exist.
 if [ ! -f "$WP_CONFIG_FILE" ]; then
     echo "[WORDPRESS] >> No wp-config.php found. WordPress installation is required."
 
@@ -89,17 +70,16 @@ else
     echo "[WORDPRESS] >> Existing wp-config.php! Skip reinstalling WordPress and recreating users!"
 fi
 
-# Update WordPress home URL.
+# update WordPress home URL and sit e URL to use HTTPS and the correct domain name.
 wp option update home "$WP_FULL_URL" --allow-root
-# Update WordPress site URL.
 wp option update siteurl "$WP_FULL_URL" --allow-root
 
 echo "[WORDPRESS] >> Configuring Redis cache..."
-# Configure Redis connection.
+# configure Redis connection.
 wp config set WP_REDIS_HOST "redis" --allow-root
 wp config set WP_REDIS_PORT 6379 --raw --allow-root
 
-# Install Redis Object Cache plugin if necessary.
+# install Redis Object Cache plugin if necessary.
 if ! wp plugin is-installed redis-cache --allow-root; then
     echo "[WORDPRESS] >> Installing Redis Object Cache plugin..."
     wp plugin install redis-cache --activate --allow-root
@@ -116,4 +96,5 @@ chown -R www-data:www-data "$WORDPRESS_DIR"
 
 echo "[WORDPRESS] >> Starting PHP-FPM server in foreground..."
 echo "[WORDPRESS] >> Current Bash PID: $$"
+
 exec php-fpm8.2 -F

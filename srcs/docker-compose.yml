@@ -22,6 +22,11 @@ services:
     secrets:
       - db_root_password
       - db_password
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb -h localhost -u rmedeiro -p$$(cat /run/secrets/db_password) -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 1s
+      timeout: 2s
+      retries: 30
 
   # wordPress runs with php-fpm and uses mariadb as its database.
   wordpress:
@@ -48,8 +53,10 @@ services:
       - wp_user_password
     # start mariadb before wordpress because wordpress needs its database. 
     depends_on:
-      - mariadb
-      - redis
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "grep", "-q", "php-fpm", "/proc/1/cmdline"]
       interval: 1s
