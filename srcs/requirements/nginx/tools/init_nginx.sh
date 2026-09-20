@@ -9,7 +9,7 @@ NGINX_CONFIG_FILE="/etc/nginx/conf.d/default.conf"
 NGINX_SSL_CERT="$NGINX_SSL_DIR/inception.crt"
 NGINX_SSL_KEY="$NGINX_SSL_DIR/inception.key"
 
-# create the dir where SSL and private key will be stored.
+echo "[NGINX] >> Creating directory where SSL certificate and private key will be stored..."
 mkdir -p "$NGINX_SSL_DIR"
 
 # -x509      creates a self-signed certificate.
@@ -106,4 +106,5 @@ nginx -t
 
 echo "[NGINX] >> Starting NGINX server in foreground..."
 echo "[NGINX] >> Preventing NGINX from moving to the background so Docker can keep the container running..."
+echo "[NGINX] >> NGINX is now serving the WordPress website at https://${DOMAIN_NAME}/ in web browser."
 exec nginx -g "daemon off;"

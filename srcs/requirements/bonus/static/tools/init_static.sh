@@ -7,7 +7,7 @@ set -eu
 NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
 STATIC_DIR="/var/www/html"
 
-# create dir where the static website files are stored.
+echo "[STATIC] >> Creating directory where the static website files will be stored..."
 mkdir -p "$STATIC_DIR"
 
 echo "[STATIC] >> Creating the NGINX configuration file to serve the static website..."
@@ -49,4 +49,5 @@ echo "[STATIC] >> Testing the generated NGINX configuration before starting the 
 nginx -t
 
 echo "[STATIC] >> Starting NGINX server in foreground..."
+echo "[STATIC] >> NGINX is now serving the static website at https://${DOMAIN_NAME}/static/ in web browser."
 exec nginx -g "daemon off;"
