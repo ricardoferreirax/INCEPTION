@@ -99,6 +99,8 @@ services:
     image: redis
     container_name: redis
     restart: on-failure
+    env_file:
+      - .env
     networks:
       - inception_bridge
     healthcheck:
@@ -118,13 +120,15 @@ services:
     image: adminer
     container_name: adminer
     restart: on-failure
+    env_file:
+      - .env
     expose:
       - "8080"
     networks:
       - inception_bridge
     depends_on:
       - mariadb
-
+  
   # ftp provides remote file access to the WP website. It shares wp_content_store with WP and NGINX, so 
   # transferred files through ftp refer to same files used by wp and nginx and affect the same persistent website files. 
   # It uses port 21 and the 40000-40010 passive range are published to the host because an external ftp client must 
@@ -161,6 +165,8 @@ services:
     image: static
     container_name: static
     restart: on-failure
+    env_file:
+      - .env
     expose:
       - "8081"
     networks:
@@ -177,6 +183,8 @@ services:
     image: portainer
     container_name: portainer
     restart: on-failure
+    env_file:
+      - .env
     volumes:
       - portainer_store:/data
       - /var/run/docker.sock:/var/run/docker.sock
