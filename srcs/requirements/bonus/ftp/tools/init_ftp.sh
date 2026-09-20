@@ -14,6 +14,7 @@ else
     exit 1
 fi
 
+echo "[FTP] >> Creating directory where FTP user home and WordPress files are stored..."
 mkdir -p "$FTP_ROOT"
 mkdir -p "$VSFTPD_SECURE_DIR"
 

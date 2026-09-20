@@ -11,7 +11,7 @@ MARIADB_SOCKET="$MARIADB_RUN_DIR/mysqld.sock"
 MARIADB_CONFIG_FILE="/etc/mysql/mariadb.conf.d/docker.cnf"
 MARIADB_INIT_FILE="$MARIADB_DATA_DIR/.mariadb_ready"
 
-# check if the required docker secrets exist and read the DB passwords.
+echo "[MARIADB] >> Checking if required Docker secrets exist..."
 if [ -f /run/secrets/db_password ] && [ -f /run/secrets/db_root_password ]; then
     DB_PASSWORD=$(cat /run/secrets/db_password)
     DB_ROOT_PASSWORD=$(cat /run/secrets/db_root_password)
@@ -20,10 +20,10 @@ else
     exit 1
 fi
 
-# create the runtime and the persistent database directories.
+echo "[MARIADB] >> Creating persistent and runtime directories for MariaDB..."
 mkdir -p "$MARIADB_RUN_DIR" "$MARIADB_DATA_DIR"
 
-# MDB runs as the mysql user, so it needs ownership of these directories.
+echo "[MARIADB] >> Giving mysql ownership of the MariaDB persistent and runtime directories so MariaDB can access them..."
 chown -R mysql:mysql "$MARIADB_RUN_DIR" "$MARIADB_DATA_DIR"
 
 echo "[MARIADB] >> Creating MariaDB configuration file..."
@@ -44,37 +44,37 @@ socket=${MARIADB_SOCKET}
 EOF
 echo "[MARIADB] >> MariaDB configuration created successfully."
 
-# check if MDB has already been initialized, preventing users and database from being recreated.
+echo "[MARIADB] >> Checking if MariaDB database is already initialized..."
 if [ ! -f "$MARIADB_INIT_FILE" ]; then
     echo "[MARIADB] >> No initialization file found! Intializing MariaDB database..."
+
     echo "[MARIADB] >> Starting temporary MariaDB server in the background..."
-	# run MDB as the mysql system user instead of root
-    # use the persistent dir to store the database files
-    # create the socket used by the initialization commands.
-    # disable tcp connections and run the server in the background
     mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET" --skip-networking &
+
+	echo "[MARIADB] >> MDB run as the mysql system user instead of root"
+	echo "[MARIADB] >> MDB TCP connections disabled to prevent other containers from connecting to the temporary MDB server"
+	echo "[MARIADB] >> MDB running in the background so the script can continue to execute initialization commands"
 	
-	# pid of the last process started in the background.
+	# pid of the last process started in the background."
     MARIADB_PID=$!
     echo "[MARIADB] >> Temporary MariaDB PID: $MARIADB_PID"
 
     echo "[MARIADB] >> Trying to connect to the temporary MariaDB server..."
-    # try a simple query (SELECT 1) several times to verify MDB is ready to receive and execute SQL commands before continuing
+	echo "[MARIADB] >> Try a simple query to verify MDB is ready to receive and execute SQL commands..."
     # if it succeeds, exit the loop, otherwise, wait one second before trying again.
     for i in {1..10}; do
         if mariadb --socket="$MARIADB_SOCKET" -u root -e "SELECT 1" >/dev/null 2>&1; then
             break
         fi
-        echo "[MARIADB] >> Waiting for MariaDB..."
+		echo "[MARIADB] >> Temporary MariaDB server is not ready yet. Waiting for 1 second before trying again..."
         sleep 1
     done
 
-    # perform one final connection test. If MDB still can't execute a query, stop with an error.
+	echo "[MARIADB] >> Performing one final connection test to the temporary MariaDB server..."
     if ! mariadb --socket="$MARIADB_SOCKET" -u root -e "SELECT 1" >/dev/null 2>&1; then
         echo "[ERROR] >> Temporary MariaDB server failed to become ready."
         exit 1
     fi
-
 	echo "[MARIADB] >> Temporary MariaDB server is ready to accept connections."
 
     echo "[MARIADB] >> Configuring the WordPress database and database user..."
@@ -101,6 +101,7 @@ EOF
     echo "[MARIADB] >> Creating initialization marker inside the persistent database directory..."
     touch "$MARIADB_INIT_FILE"
 
+	echo "[MARIADB] >> Giving mysql ownership of the MariaDB initialization marker..."
     chown mysql:mysql "$MARIADB_INIT_FILE"
 
     echo "[MARIADB] >> Stop the temporary MariaDB server..."
@@ -114,11 +115,7 @@ else
     echo "[MARIADB] >> Database already initialized. Skipping initialization."
 fi
 
-# start the real MDB server in the foreground.
 echo "[MARIADB] >> Starting MariaDB server in foreground..."
+echo "[MARIADB] >> Exec replaces the bash process with mariadbd, making MDB PID 1 inside the container."
 echo "[MARIADB] >> Current Bash PID: $$"
-
-# exec replaces the bash process with mariadbd, making MDB PID 1 inside the container. 
-# docker can send signals directly to MDB, allowing it to shut down correctly while keeping 
-# the container running in foreground.
 exec mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET"

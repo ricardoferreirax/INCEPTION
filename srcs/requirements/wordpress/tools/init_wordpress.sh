@@ -10,7 +10,7 @@ WP_CONFIG_FILE="$WORDPRESS_DIR/wp-config.php"
 PHP_FPM_RUN_DIR="/run/php"
 PHP_FPM_CONFIG_FILE="/etc/php/8.2/fpm/pool.d/www.conf"
 
-# check if the required Docker secrets exist and read the database and WP passwords.
+echo "[WORDPRESS] >> Checking if required Docker secrets exist..."
 if [ -f /run/secrets/db_password ] && [ -f /run/secrets/wp_admin_password ] && [ -f /run/secrets/wp_user_password ]; then
     DB_PASSWORD=$(cat /run/secrets/db_password)
     WP_ADMIN_PASSWORD=$(cat /run/secrets/wp_admin_password)
@@ -20,13 +20,13 @@ else
     exit 1
 fi
 
-# build the complete HTTPS URL used by WP from the domain.
+echo "[WORDPRESS] >> Building the complete WordPress URL from the domain name..."
 WP_FULL_URL="https://${DOMAIN_NAME}"
 
-# create WP persistent dir and the PHP-FPM runtime dir.
+echo "[WORDPRESS] >> Creating persistent WordPress directory and PHP-FPM runtime directory..."
 mkdir -p "$WORDPRESS_DIR" "$PHP_FPM_RUN_DIR"
 
-# WP and PHP-FPM run as www-data, so this user needs ownership of these directories.
+echo "[WORDPRESS] >> Giving www-data ownership of the WordPress and PHP-FPM directories so PHP-FPM can access them..."
 chown -R www-data:www-data "$WORDPRESS_DIR" "$PHP_FPM_RUN_DIR"
 
 echo "[WORDPRESS] >> Creating PHP-FPM pool configuration file..."
@@ -65,12 +65,11 @@ clear_env = no
 EOF
 echo "[WORDPRESS] >> PHP-FPM configuration created successfully."
 
-# move into the persistent WP dir so WP-CLI executes its commands.
+echo "[WORDPRESS] >> Moving into the persistent WordPress directory so WP-CLI can execute its commands..."
 cd "$WORDPRESS_DIR"
 
-# check if WP has already been configured, preventing WP and its users from being recreated.
+echo "[WORDPRESS] >> Checking if WordPress is already initialized..."
 if [ ! -f "$WP_CONFIG_FILE" ]; then
-
     echo "[WORDPRESS] >> No wp-config.php found! Initializing WordPress..."
 
     echo "[WORDPRESS] >> Downloading WordPress core files..."
@@ -104,13 +103,10 @@ echo "[WORDPRESS] >> Updating WordPress home and siteurl options to use correct 
 wp option update home "$WP_FULL_URL" --allow-root
 wp option update siteurl "$WP_FULL_URL" --allow-root
 
-# give www-data user ownership of persistent WP files so PHP-FPM can read and modify them.
-echo "[WORDPRESS] >> Updating WordPress file ownership..."
+echo "[WORDPRESS] >> Giving www-data ownership of the WordPress files so PHP-FPM can read and modify them..."
 chown -R www-data:www-data "$WORDPRESS_DIR"
 
 echo "[WORDPRESS] >> Starting PHP-FPM server in foreground..."
 echo "[WORDPRESS] >> Current Bash PID: $$"
-# exec replaces the Bash process with PHP-FPM, making PHP-FPM PID 1 inside the container.
-# docker can then send signals directly to PHP-FPM, allowing it to shut down correctly while keeping
-# the container running in foreground.
+echo "[WORDPRESS] >> Exec replaces the Bash process with PHP-FPM, making PHP-FPM PID 1 inside the container."
 exec php-fpm8.2 -F
