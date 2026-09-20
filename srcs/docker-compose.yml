@@ -1,10 +1,10 @@
+# docker Compose defines and orchestrates all containers required by Inception.
+# it builds each service from its dockerfile and manages how containers share networks, 
+# volumes, env variables, secrets, ports and dependencies.
+
 services:
 
-  # MDB stores database used by WP and communicates with the other containers through the private network. 
-  # Its DB files are persisted in wp_database_store, so they survive container recreation. 
-  # MDB_PORT is exposed only inside the Docker network and is not published to the host. 
-  # MDB healthcheck executes a simple SQL query to confirm that MDB is actually ready to accept connections, 
-  # allowing WP wait for a healthy DB instead of only waiting for the container to be started.
+  # MDB stores the WP database.
   mariadb:
     build:
       context: ./requirements/mariadb
@@ -29,11 +29,7 @@ services:
       timeout: 2s
       retries: 30
 
-  # WP runs website through php-fpm and communicates with MDB and redis through private network. 
-  # Its website files are persisted in wp_content_store and shared with nginx and FTP. 
-  # PHP_FPM_PORT is exposed only inside the docker network so nginx can forward PHP requests to it.
-  # WP's healthcheck verifies that pid 1 is php-fpm, preventing nginx from starting while WP is still
-  # downloading, installing or configuring the website before php-fpm runs.
+  # WP runs with PHP-FPM and stores its files in a persistent volume.
   wordpress:
     build:
       context: ./requirements/wordpress
@@ -64,11 +60,8 @@ services:
       timeout: 2s
       retries: 30
 
-  # NGINX is the only https entry point for the websites and web interfaces.
-  # Port 443 is published to the host because external clients must be able to reach it. 
-  # It shares wp_content_store with WordPress to serve website files and uses docker network to communicate 
-  # with internal services such as WP, adminer, static and portainer. 
-  # NGINX waits for the WP healthcheck so php-fpm is running before NGINX starts accepting php requests.
+  # NGINX is the main HTTPS entry point and the only web service exposed on port 443.
+  # it serves WP and proxies requests to the internal bonus web services.
   nginx:
     build:
       context: ./requirements/nginx
@@ -88,10 +81,7 @@ services:
       wordpress:
         condition: service_healthy
 
-  # redis provides a memory object cache used by WP to reduce repeated DB operations. 
-  # It is connected only to docker network because it only needs to communicate with WP. 
-  # No persistent volume is required here, redis data is used as temporary cache, and WP only requires the redis to 
-  # be started before WP starts.
+  # Redis provides an in-memory object cache for WP.
   redis:
     build:
       context: ./requirements/bonus/redis
@@ -109,10 +99,7 @@ services:
       timeout: 2s
       retries: 30
 
-  # adminer provides a web interface for managing the MDB database. 
-  # It uses docker network to connect to MDB and to receive proxied requests from NGINX. 
-  # Port 8080 is exposed only inside the docker network because users reach adminer through NGINX instead of 
-  # connecting directly to the container. It does not need a volume because database persistence is handled by MDB itself.
+  # Adminer provides a web interface for MariaDB.
   adminer:
     build:
       context: ./requirements/bonus/adminer
@@ -127,12 +114,10 @@ services:
     networks:
       - inception_bridge
     depends_on:
-      - mariadb
-  
-  # ftp provides remote file access to the WP website. It shares wp_content_store with WP and NGINX, so 
-  # transferred files through ftp refer to same files used by wp and nginx and affect the same persistent website files. 
-  # It uses port 21 and the 40000-40010 passive range are published to the host because an external ftp client must 
-  # connect to them.
+      mariadb:
+        condition: service_healthy
+
+  # FTP provides remote access to the persistent WordPress files.
   ftp:
     build:
       context: ./requirements/bonus/ftp
@@ -154,10 +139,8 @@ services:
     depends_on:
       - wordpress
 
-  # static hosts the static website independently from WP. It is connected to docker network so NGINX can reach it 
-  # by its service name. Port 443 is exposed internally because external requests reach the static website through 
-  # NGINX reverse proxy, so NGINX can proxy requests to static without publishing another web port directly on the host.
-  # It does not require persistent storage because its static files are included in its image.
+  # Static serves an independent HTML, CSS and JavaScript website.
+  # Port 8081 is internal because NGINX proxies /static/ requests to this service.
   static:
     build:
       context: ./requirements/bonus/static
@@ -172,10 +155,7 @@ services:
     networks:
       - inception_bridge
 
-  # portainer provides a web interface for monitoring and managing Docker. It accesses the Docker daemon through 
-  # /var/run/docker.sock and stores its own configuration persistently in portainer_store. 
-  # It uses docker network so NGINX can proxy requests to it, while port 9000 is exposed only internally instead of 
-  # being published directly to the host.
+  # Portainer provides a web interface for Docker management.
   portainer:
     build:
       context: ./requirements/bonus/portainer
@@ -193,8 +173,11 @@ services:
     expose:
       - "9000"
 
+# Volumes provide persistent storage outside the containers.
+# Docker manages the volume names, while bind mounts store the actual data
 volumes:
 
+  # Stores MDB database files persistently.
   wp_database_store:
     name: wp_database_store
     driver: local
@@ -203,6 +186,7 @@ volumes:
       o: bind
       device: /home/${USER}/data/mariadb
 
+  # Stores WP files persistently and allows the same files to be shared between WP, NGINX and FTP.
   wp_content_store:
     name: wp_content_store
     driver: local
@@ -219,21 +203,34 @@ volumes:
       o: bind
       device: /home/${USER}/data/portainer
 
-# the private bridge network allows containers to communicate using their service names while 
-# keeping internal services isolated from direct access by the host.
+
+# bridge network creates a private network shared by the containers.
+# containers connected to it can communicate using their service names, without exposing 
+# internal service ports directly to the host.
 networks:
 
   inception_bridge:
+    # Bridge creates an isolated network on the Docker host while allowing communication 
+    # between connected containers.
     driver: bridge
 
+
+# secrets keep sensitive credentials outside dockerfiles and source code.
+# docker makes each secret available inside the required container as a file instead of 
+# storing passwords directly in environment variables.
 secrets:
+
   db_root_password:
     file: ../secrets/db_root_password.txt
+
   db_password:
     file: ../secrets/db_password.txt
+
   wp_admin_password:
     file: ../secrets/wp_admin_password.txt
+
   wp_user_password:
     file: ../secrets/wp_user_password.txt
+
   ftp_password:
     file: ../secrets/ftp_password.txt
