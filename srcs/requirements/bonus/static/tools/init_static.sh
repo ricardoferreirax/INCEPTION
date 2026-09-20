@@ -3,51 +3,39 @@
 # stop the script immediately if a command fails or if an undefined variable is used.
 set -eu
 
-STATIC_DIR="/var/www/html"
+# path of the NGINX config file and dir where the static website files are stored.
 NGINX_CONFIG_FILE="/etc/nginx/nginx.conf"
-NGINX_SSL_DIR="/etc/nginx/ssl"
-NGINX_SSL_CERT="$NGINX_SSL_DIR/static.crt"
-NGINX_SSL_KEY="$NGINX_SSL_DIR/static.key"
+STATIC_DIR="/var/www/html"
 
-# create dirs required by static website and SSL config
-mkdir -p "$STATIC_DIR" "$NGINX_SSL_DIR"
-
-echo "[STATIC] >> Creating a self-signed SSL certificate for the static website..."
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout "$NGINX_SSL_KEY" -out "$NGINX_SSL_CERT" \
-    		-subj "/C=PT/ST=Lisbon/L=Lisbon/O=42/OU=Inception/CN=static"
+# create dir where the static website files are stored.
+mkdir -p "$STATIC_DIR"
 
 echo "[STATIC] >> Creating the NGINX configuration file to serve the static website..."
 cat > "$NGINX_CONFIG_FILE" << EOF
-# define the NGINX event processing context.
+# NGINX event processing context. No custom event config is required for static website.
 events
 {
 }
 
-# define the HTTP server configuration.
+# define HTTP server config.
 http
 {
-    # allows NGINX to return the correct content type for files such as html, css and js.
+    # allows NGINX to identify HTML, CSS and JS files.
     include /etc/nginx/mime.types;
 
     server
     {
-        # accept HTTPS connections on port 443.
-        listen 443 ssl;
+        # listen on port 8081 inside the network. NGINX forwards /static/ requests to this port.
+        listen 8081;
 
-        # configure SSL certificate and private key used by static website.
-        ssl_certificate ${NGINX_SSL_CERT};
-        ssl_certificate_key ${NGINX_SSL_KEY};
-
-        ssl_protocols TLSv1.2 TLSv1.3;
-
-        # define the dir containing the static website files.
+        # dir containing the static website files.
         root ${STATIC_DIR};
 
-        # use index.html as the default page when a dir is requested.
+        # define index.html as the default page.
         index index.html;
 
-        # NGINX first tries to find the requested file. If the request points to a dir, it tries that dir.
-        # If don't exists, NGINX returns HTTP 404.
+        # NGINX first tries to find the requested file. If refers to a dir, it tries that dir.
+        # if neither exists, NGINX returns HTTP 404.
         location /
         {
             try_files \$uri \$uri/ =404;
@@ -61,5 +49,4 @@ echo "[STATIC] >> Testing the generated NGINX configuration before starting the 
 nginx -t
 
 echo "[STATIC] >> Starting NGINX server in foreground..."
-echo "[NGINX] >> Preventing NGINX from moving to the background so Docker can keep the container running..."
 exec nginx -g "daemon off;"

@@ -162,7 +162,7 @@ services:
     container_name: static
     restart: on-failure
     expose:
-      - "443"
+      - "8081"
     networks:
       - inception_bridge
 

@@ -76,12 +76,9 @@ server
 
     # forward requests under /static/ to the static website container.
     location /static/
-    {
-        proxy_pass https://static/;
-
-        # static uses a self-signed certificate, so certificate verification is disabled for this internal connection.
-        proxy_ssl_verify off;
-    }
+	{
+	    proxy_pass http://static:8081/;
+	}
 
     # forward requests under /portainer/ to the portainer container.
     location /portainer/
