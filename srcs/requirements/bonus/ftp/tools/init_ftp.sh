@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Stop immediately if any command fails or if an undefined variable is used.
+# stop the script immediately if a command fails or if an undefined variable is used.
 set -eu
 
 FTP_ROOT="/var/www/html"
@@ -17,46 +17,56 @@ fi
 mkdir -p "$FTP_ROOT"
 mkdir -p "$VSFTPD_SECURE_DIR"
 
-# Create FTP user only if it does not already exist.
-# The home directory points directly to the WordPress files.
 if ! id "ftpuser" >/dev/null 2>&1; then
-    echo "[FTP] >> FTP user not found. Creating user..."
-    useradd -d "$FTP_ROOT" -s /bin/bash "ftpuser"
-    # Set FTP user's password using the Docker secret.
+    echo "[FTP] >> Creating FTP user..."
+    useradd -d "$FTP_ROOT" -s /bin/bash ftpuser
+
+	echo "[FTP] >> Setting FTP user password..."
     echo "ftpuser:${FTP_PASSWORD}" | chpasswd
-    # Add FTP user to www-data group so it can access files shared with WordPress.
-    usermod -aG www-data "ftpuser"
+
+	echo "[FTP] >> Adding FTP user to www-data group so it can work with the same files used by WP..."
+    usermod -aG www-data ftpuser
+
     echo "[FTP] >> FTP user created successfully."
-else
-    echo "[FTP] >> Existing FTP user found. Skipping user creation."
 fi
 
+echo "[FTP] >> Giving www-data ownership of the WordPress files..."
 chown -R www-data:www-data "$FTP_ROOT"
-
-# Give www-data group write permission so the FTP user can upload,
-# modify and delete files.
 chmod -R g+w "$FTP_ROOT"
+echo "[FTP] >> Group write permission granted to the WP files so FTP user can modify them through FTP."
 
-echo "[FTP] >> Creating vsftpd configuration file..."
+echo "[FTP] >> Creating vsftpd configuration file used by FTP server..."
 cat > "$VSFTPD_CONFIG_FILE" << EOF
+# listen for FTP connections using IPv4 on the standard FTP port
 listen=YES
 listen_ipv6=NO
 listen_port=21
+
+# disable anonymous access and only allow local system users
 anonymous_enable=NO
 local_enable=YES
+
+# allow FTP user to upload, modify and delete files.
 write_enable=YES
+
+# enable passive FTP mode and define the ports used for data connections.
 pasv_enable=YES
 pasv_address=127.0.0.1
 pasv_min_port=40000
 pasv_max_port=40010
+
+# restrict FTP user to its home directory.
 chroot_local_user=YES
 allow_writeable_chroot=YES
 secure_chroot_dir=${VSFTPD_SECURE_DIR}
+
+# files created through FTP use standard read permissions and remain writable by their owner.
 local_umask=022
+
+# FTP connections are not encrypted with TLS.
 ssl_enable=NO
 EOF
 echo "[FTP] >> vsftpd configuration created successfully."
 
 echo "[FTP] >> Starting vsftpd server in foreground..."
-echo "[FTP] >> Current Bash PID: $$"
 exec vsftpd "$VSFTPD_CONFIG_FILE"
