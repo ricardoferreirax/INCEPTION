@@ -3,8 +3,8 @@
 # stop the script if a command fails (-e) or if an undefined variable is used (-u)
 set -eu
 
-# define the MDB: persistent dir (where DB files are stored), the runtime dir with unix socket
-# (used for local communication), MDB config file, and the init marker used to identify if the database was already configured.
+# define MDB persistent dir (where DB files are stored), the runtime dir with unix socket,
+# MDB config file, and the init marker used to identify if the database was already configured.
 MARIADB_DATA_DIR="/var/lib/mysql"
 MARIADB_RUN_DIR="/run/mysqld"
 MARIADB_SOCKET="$MARIADB_RUN_DIR/mysqld.sock"
@@ -23,7 +23,7 @@ fi
 echo "[MARIADB] >> Creating persistent and runtime directories for MariaDB..."
 mkdir -p "$MARIADB_RUN_DIR" "$MARIADB_DATA_DIR"
 
-echo "[MARIADB] >> Giving mysql ownership of the MariaDB persistent and runtime directories so MariaDB can access them..."
+echo "[MARIADB] >> Giving mysql ownership of the MariaDB persistent and runtime directories..."
 chown -R mysql:mysql "$MARIADB_RUN_DIR" "$MARIADB_DATA_DIR"
 
 echo "[MARIADB] >> Creating MariaDB configuration file..."
@@ -61,7 +61,6 @@ if [ ! -f "$MARIADB_INIT_FILE" ]; then
 
     echo "[MARIADB] >> Trying to connect to the temporary MariaDB server..."
 	echo "[MARIADB] >> Try a simple query to verify MDB is ready to receive and execute SQL commands..."
-    # if it succeeds, exit the loop, otherwise, wait one second before trying again.
     for i in {1..10}; do
         if mariadb --socket="$MARIADB_SOCKET" -u root -e "SELECT 1" >/dev/null 2>&1; then
             break
@@ -116,6 +115,5 @@ else
 fi
 
 echo "[MARIADB] >> Starting MariaDB server in foreground..."
-echo "[MARIADB] >> Exec replaces the bash process with mariadbd, making MDB PID 1 inside the container."
 echo "[MARIADB] >> Current Bash PID: $$"
 exec mariadbd --user=mysql --datadir="$MARIADB_DATA_DIR" --socket="$MARIADB_SOCKET"
