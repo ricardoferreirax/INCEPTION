@@ -3,8 +3,8 @@
 # stop the script if a command fails (-e) or if an undefined variable is used (-u).
 set -eu
 
-# define WP and PHP-FPM: the persistent dir where WP files are stored, the wp-config.php file
-# used to identify if WP was already configured, the PHP-FPM runtime directory, and its config file.
+# define WP persistent dir where WP files are stored, wp-config.php file to identify if WP 
+# was already configured, the PHP-FPM runtime directory, and config file.
 WORDPRESS_DIR="/var/www/html"
 WP_CONFIG_FILE="$WORDPRESS_DIR/wp-config.php"
 PHP_FPM_RUN_DIR="/run/php"
@@ -26,7 +26,7 @@ WP_FULL_URL="https://${DOMAIN_NAME}"
 echo "[WORDPRESS] >> Creating persistent WordPress directory and PHP-FPM runtime directory..."
 mkdir -p "$WORDPRESS_DIR" "$PHP_FPM_RUN_DIR"
 
-echo "[WORDPRESS] >> Giving www-data ownership of the WordPress and PHP-FPM directories so PHP-FPM can access them..."
+echo "[WORDPRESS] >> Giving www-data ownership of the WordPress and PHP-FPM directories..."
 chown -R www-data:www-data "$WORDPRESS_DIR" "$PHP_FPM_RUN_DIR"
 
 echo "[WORDPRESS] >> Creating PHP-FPM pool configuration file..."
@@ -108,5 +108,4 @@ chown -R www-data:www-data "$WORDPRESS_DIR"
 
 echo "[WORDPRESS] >> Starting PHP-FPM server in foreground..."
 echo "[WORDPRESS] >> Current Bash PID: $$"
-echo "[WORDPRESS] >> Exec replaces the Bash process with PHP-FPM, making PHP-FPM PID 1 inside the container."
 exec php-fpm8.2 -F
