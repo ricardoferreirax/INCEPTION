@@ -12,17 +12,12 @@ NGINX_SSL_KEY="$NGINX_SSL_DIR/inception.key"
 echo "[NGINX] >> Creating directory where SSL certificate and private key will be stored..."
 mkdir -p "$NGINX_SSL_DIR"
 
-# -x509      creates a self-signed certificate.
-# -nodes     creates the private key without password protection.
-# -days 365  makes the certificate valid for 365 days.
-# -newkey    creates a new private key together with the certificate.
-# rsa:2048   uses a 2048-bit RSA private key.
-# -keyout    defines where the private key is stored.
-# -out       defines where the certificate is stored.
-# -subj      provides the certificate information without interactive input.
 echo "[NGINX] >> Creating a self-signed SSL certificate so NGINX can accept HTTPS connections..."
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout "$NGINX_SSL_KEY" -out "$NGINX_SSL_CERT" \
 			-subj "/C=PT/ST=Lisbon/L=Lisbon/O=42/OU=Inception/CN=${DOMAIN_NAME}"
+echo "[NGINX] >> Created private key without pass protection and SSL certificate valid for 365 days."
+echo "[NGINX] >> Created new private key together with the certificate using 2048-bit RSA."
+echo "[NGINX] >> The private key is stored at ${NGINX_SSL_KEY} and the certificate is stored at ${NGINX_SSL_CERT}."
 
 echo "[NGINX] >> Creating NGINX server configuration file..."
 cat > "$NGINX_CONFIG_FILE" << EOF
@@ -105,6 +100,5 @@ echo "[NGINX] >> Testing the generated NGINX configuration before starting the s
 nginx -t
 
 echo "[NGINX] >> Starting NGINX server in foreground..."
-echo "[NGINX] >> Preventing NGINX from moving to the background so Docker can keep the container running..."
 echo "[NGINX] >> NGINX is now serving the WordPress website at https://${DOMAIN_NAME}/ in web browser."
 exec nginx -g "daemon off;"
