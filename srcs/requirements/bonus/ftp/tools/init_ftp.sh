@@ -7,6 +7,7 @@ FTP_ROOT="/var/www/html"
 VSFTPD_CONFIG_FILE="/etc/vsftpd.conf"
 VSFTPD_SECURE_DIR="/var/run/vsftpd/empty"
 
+ecbho "[FTP] >> Checking if required Docker secret exists..."
 if [ -f /run/secrets/ftp_password ]; then
     FTP_PASSWORD=$(cat /run/secrets/ftp_password)
 else
@@ -18,6 +19,7 @@ echo "[FTP] >> Creating directory where FTP user home and WordPress files are st
 mkdir -p "$FTP_ROOT"
 mkdir -p "$VSFTPD_SECURE_DIR"
 
+echo "[FTP] >> Checking if FTP user already exists..."
 if ! id "ftpuser" >/dev/null 2>&1; then
     echo "[FTP] >> Creating FTP user..."
     useradd -d "$FTP_ROOT" -s /bin/bash ftpuser
