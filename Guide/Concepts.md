@@ -1,976 +1,485 @@
-# Docker Concepts for Inception
+## Eval questions 
 
-This document explains the most important Docker concepts needed to understand the **Inception** project.
+### 1) How Docker and Docker Compose works?
 
----
+Docker: é uma plataforma que corresponde a um conjunto de ferramentas que permitem criar, executar e gerir containers.
 
-# 1. Why Do We Need Docker?
+Docker Compose: é uma ferramenta usada para definir e gerir vários containers em conjunto. Lê o ficheiro docker-compose.yml, onde declaramos os serviços, networks, volumes, portas, secrets e dependências, e comunica com o Docker Engine para criar toda essa infraestrutura.
 
-Imagine that we create a WordPress website on our computer.
+Resposta: Docker cria e gere os containers; Docker Compose define e coordena vários containers e os recursos necessários para funcionarem em conjunto.
 
-For that website to work, we need several things installed and configured correctly:
+### 2) The difference between a Docker image used with docker compose and without docker compose
 
-* A Linux system.
-* Nginx.
-* PHP.
-* PHP-FPM.
-* MariaDB.
-* WordPress files.
-* Database users.
-* Configuration files.
-* Correct ports.
-* Correct permissions.
-* Environment variables.
-* TLS certificates.
+Não existe diferença na Docker image em si.
+Uma image criada com docker build e uma image criada através de docker compose build, são ambas Docker images normais.
+A diferença está na forma como são construídas, configuradas e utilizadas:
 
-If everything is installed directly on the system, the project may work on our machine but fail on another machine.
+Sem Docker Compose: tens de usar manualmente comandos como docker build e docker run, indicando networks, volumes, portas, environment variables, secrets, etc.
+Com Docker Compose: essas configurações ficam declaradas no docker-compose.yml, e o Compose comunica com o Docker Engine para criar e configurar os containers.
+Resposta curta para avaliação
 
-For example, on our computer we may have:
+Não existe uma image especial do Docker Compose. O Compose utiliza Docker images normais. A diferença é que o Docker Compose automatiza e centraliza num ficheiro YAML a construção das images e a configuração dos containers, networks, volumes, portas, secrets e dependências.
 
-```text
-PHP 8.2
-MariaDB installed
-Nginx configured correctly
-Correct permissions
-```
+### 3) The benefit of Docker compared to VMs
 
-But on another computer, there may be:
+O Docker é mais leve e rápido porque os containers partilham o kernel do sistema operativo do host, enquanto uma VM virtualiza uma máquina completa e normalmente executa o seu próprio sistema operativo e kernel.
 
-```text
-Different PHP version
-Missing PHP extensions
-No MariaDB installed
-Wrong Nginx configuration
-Different filesystem permissions
-```
+Por isso, os containers normalmente:
 
-The application itself may be correct, but the environment is different. That is the problem Docker solves.
+iniciam mais rapidamente;
+consomem menos RAM e armazenamento;
+são mais fáceis de criar e destruir;
+permitem executar mais serviços com os mesmos recursos.
+Resposta curta para avaliação
 
-Docker allows us to describe the environment needed by each service and package it in a reproducible way.
+A principal vantagem do Docker é ser mais leve que uma VM. Uma VM virtualiza uma máquina completa e tem o seu próprio sistema operativo e kernel, enquanto os containers partilham o kernel do host e isolam principalmente os processos e as suas dependências. Por isso, containers são geralmente mais rápidos de iniciar e consomem menos recursos.
 
-Instead of saying:
+Mas atenção: Docker não substitui completamente VMs. As VMs oferecem isolamento ao nível da máquina, enquanto os containers oferecem isolamento ao nível dos processos. No Inception usamos os dois: a VM isola o projeto da máquina física e Docker isola os serviços dentro da VM.
 
-> “Install PHP, configure MariaDB, install Nginx, copy these files, fix permissions, create users manually...”
+---------------------------------------------------------------------------------------------------------------------------------------
 
-we write Dockerfiles and a `docker-compose.yml`.
 
-Then Docker can recreate the same environment again and again.
 
-The important idea is:
 
-```text
-The project should not depend on what happens to be installed on the host.
-The project should define its own environment.
-```
 
-For Inception, this is essential because the evaluator must be able to build and run the project in a clean VM.
+## 1) O que é o Docker?
 
----
+Docker é uma plataforma que corresponde a um conjunto de ferramentas que permitem criar, 
+executar e gerir containers.
 
-# 2. What Is Docker?
+"Docker" não é propriamente um serviço, Docker é o nome da plataforma como um todo.
+No Linux, uma das peças principais do Docker, o Docker daemon, corre efetivamente como um serviço do sistema.
+Podemos visualizar assim:
 
-Docker is a platform that allows us to run applications inside isolated environments called **containers**.
+                    DOCKER
+                       │
+        ┌──────────────┼───────────────┐
+        │              │               │
+        ▼              ▼               ▼
+   Docker CLI     Docker Daemon    Docker Objects
+   (docker)        (dockerd)        │
+                                   ├── Images
+                                   ├── Containers
+                                   ├── Networks
+                                   └── Volumes
 
-A container is like a small, controlled environment created specifically for one application or one service.
+Portanto, quando falamos em "Docker", estamos normalmente a falar do conjunto inteiro, não apenas de um único 
+serviço.
 
-For example, in Inception, instead of installing MariaDB, Nginx and WordPress and PHP-FPM directly on the Debian VM, we create their containers.
+### 1.1) Docker Engine
 
-So the Debian VM contains Docker, and Docker runs the services.
+O Docker Engine é a tecnologia principal que permite criar e executar containers. De forma simplificada, é 
+composto principalmente por:
 
-The structure is:
+Docker Engine
+│
+├── Docker CLI
+│
+└── Docker Daemon
 
-```text
-Debian VM
-└── Docker Engine
-    ├── MariaDB container
-    ├── WordPress container
-    └── Nginx container
-```
+#### 1.2) Docker CLI
 
-Each container is isolated.
+Quando escreves docker ps ou docker build ou mesmo docker run nginx, estás a utilizar o Docker CLI (Command Line 
+Interface). É basicamente o comando docker. O CLI recebe aquilo que escreveste e comunica com o Docker daemon.
 
-This means that MariaDB has its own filesystem, WordPress has its own filesystem, and Nginx has its own filesystem.
+Por exemplo:
 
-They are not completely separate machines, but they behave like separate environments for most practical purposes.
+ Eu
+ │
+ │ docker ps
+ ▼
+Docker CLI
+ │
+ │ request
+ ▼
+Docker Daemon
 
-Technically, containers are not virtual machines. They do not emulate a full operating system.
+O CLI, por si só, não é quem executa os containers. É principalmente a interface através da qual damos instruções 
+ao Docker Engine.
 
-Instead, containers use the host Linux kernel, but Docker isolates their processes, filesystems, networks, and resources using Linux features such as namespaces and cgroups.
+#### 1.3) Docker Daemon
 
-Simple explanation:
+Aqui chegamos à parte que realmente é um serviço. O Docker daemon, ou dockerd, é um processo que corre em background 
+e é responsável por gerir os objetos Docker, como por exemplo:
+
+- containers;
+- images;
+- networks;
+- volumes.
+
+Podemos pensar assim:
+
+              Docker Daemon
+                  dockerd
+                    │
+        ┌───────────┼───────────┐
+        ▼           ▼           ▼
+    Containers    Images     Networks
+                                │
+                              Volumes
+
+
+Quando escreves docker ps, não é simplesmente o comando docker que vai sozinho procurar os containers. Simplificando:
+
+								User
+								 │
+								 │ docker ps
+								 ▼
+						    Docker CLI
+								 │
+								 │ Docker API
+								 ▼
+						    Docker Daemon
+								 │
+								 │
+								 ▼
+							obtém informação
+							dos containers
+								 │
+								 ▼
+							 Docker CLI
+								 │
+								 ▼
+							  Terminal
 
-```text
-Virtual Machine = full operating system inside another operating system
-Container       = isolated process using the host kernel
-```
+Ou seja:
 
-That is why containers are usually lighter and faster than virtual machines.
+- escreves docker ps;
+- o Docker CLI interpreta o comando;
+- comunica com o Docker daemon;
+- o daemon obtém a informação;
+- a resposta é devolvida;
+- o CLI apresenta-a no terminal.
 
----
+### 2) O que é realmente um container no Linux?
 
-# 3. Docker Is Not a Virtual Machine
+No Linux, um container é essencialmente um conjunto de processos isolados.
 
-This is a very important concept.
+Assim, o processo pode sentir que está num ambiente próprio, apesar de continuar a utilizar o mesmo kernel Linux.
+Todos os processos dentro dos containers usam o mesmo kernel, mas estão isolados uns dos outros.
 
-A lot of people first think that a container is the same thing as a virtual machine. It is not.
+Um container é um conjunto de processos do Linux aos quais o kernel aplica mecanismos de isolamento e controlo.
+Ou seja, quando tens:
 
-A virtual machine includes a complete operating system with its own kernel.
+- Container NGINX
+- Container WordPress
+- Container MariaDB
 
-For example:
+não existem três kernels Linux diferentes. Tens algo mais próximo disto:
 
-```text
-Physical computer
-└── VirtualBox
-    └── Debian VM
-        └── Linux kernel
-```
+                 Linux Kernel
+                      │
+          ┌───────────┼───────────┐
+          │           │           │
+          ▼           ▼           ▼
+       nginx       php-fpm      mariadbd
+       process      process       process
+          │           │           │
+       isolated    isolated    isolated
+        view         view         view
 
-The VM has its own operating system. A Docker container does not contain a full independent kernel.
-A container uses the kernel of the host system.
+Todos continuam a ser processos executados pelo mesmo kernel Linux.
+A "magia" está no facto de o kernel conseguir controlar o que cada grupo de processos consegue ver, utilizar e aceder.
 
-For Inception, the host is the Debian VM. So the containers use the Linux kernel of the Debian VM.
+Três conceitos são especialmente importantes:
 
-That means:
+Namespaces  → O que o processo consegue VER?
+Cgroups     → Quanto é que o processo pode USAR?
+Filesystem  → Que ficheiros é que o processo VÊ?
 
-```text
-Debian VM kernel
-├── MariaDB container process
-├── WordPress container process
-└── Nginx container process
-```
+Essa é uma excelente forma de começar a distinguir os três.
 
-From the outside, containers feel like small machines. But technically, they are isolated processes.
+#### 2.1) Namespaces — isolamento
 
-This is why containers start quickly. Docker does not need to boot a full OS every time.
-It only starts a process inside an isolated environment.
+Os Linux namespaces são uma funcionalidade do kernel que permite dar a determinados processos uma visão isolada 
+de recursos do sistema. Sem namespaces, os processos normalmente partilham a visão global do sistema.
+Com namespaces, podemos colocar determinados processos numa visão isolada.
 
----
+Do ponto de vista do container, parece que existe essencialmente o seu próprio conjunto de processos.
+Mas o kernel sabe perfeitamente que o processo pertence ao sistema real.
+O container não tem um kernel próprio. O container pode parecer ter:
 
-# 4. What Is a Docker Image?
+- seus processos
+- sua network
+- seu hostname
+- seus mounts
+- seu filesystem
 
-A Docker image is a template used to create containers.
+mas não tem um kernel Linux independente. É o kernel do host que cria essas diferentes visões.
+Podes imaginar o kernel como tendo a realidade completa:
 
-A simple way to understand it:
+                    KERNEL
+                       │
+       ┌───────────────┼───────────────┐
+       │               │               │
+       ▼               ▼               ▼
+ Namespace A      Namespace B      Namespace C
+       │               │               │
+     nginx           php-fpm         mariadbd
 
-```text
-Image      =  recipe
-Container  =  cake made from the recipe
-```
+Cada processo observa apenas a parte do sistema que o namespace lhe permite observar.
 
-The image contains all the instructions and files needed to create a container.
+--------------------------------------------------------------------------------------------------------
 
-For example, a MariaDB image may contain:
+##### 2.1.1) PID Namespace — isolamento de processos
 
-* Debian base system.
-* MariaDB installed.
-* MariaDB configuration file.
-* Initialization script.
-* Correct startup command.
+Um PID namespace permite que um grupo de processos tenha a sua própria árvore de PIDs.
+Assim, o mesmo processo pode ter um PID dentro do container e outro PID visto pelo host.
 
-But the image itself is not running. It is only stored on disk.
+Por exemplo:
 
-When we run a container from that image, Docker creates a running instance of it.
+     HOST                      CONTAINER
 
-Example: ``docker build -t mariadb`` builds an image, then ``docker run mariadb`` creates and starts a container from that image.
+PID 7421  php-fpm   <---->   PID 1 php-fpm
 
-In programming terms:
+Dentro do container, pode parecer que php-fpm é PID 1, mas no host, o kernel pode conhecer esse 
+processo como PID 7421. Não existem dois processos. É o mesmo processo visto através de namespaces 
+diferentes.
 
-```text
-Class   =  Image
-Object  =  Container
-```
+No WordPress tens exec php-fpm8.2 -F. O exec substitui o processo do shell pelo PHP-FPM.
+Assim, PHP-FPM passa a ser o processo principal do container:
 
-One image can create many containers.
+PID 1
+└── php-fpm
 
-For example, one Nginx image could create several Nginx containers.
+É também por isso que o teu healthcheck consegue olhar para /proc/1/cmdline e verificar se o processo 
+principal é PHP-FPM.
 
-In Inception, we normally create one container per service.
+##### 2.1.2) Network Namespace — isolamento de rede
 
----
+Um network namespace fornece uma visão isolada dos recursos de networking. 
+Um container pode ter as suas próprias:
 
-# 5. What Is a Docker Container?
+- interfaces de rede;
+- endereços IP;
+- portas;
+- regras de networking.
 
-A Docker container is a running instance of an image.
+Por isso dois containers podem, por exemplo, ter aplicações a escutar na mesma porta interna sem 
+necessariamente existir conflito.
 
-If the image is the recipe, the container is the actual running application.
+Imagina:
 
-For example:
+Container A
+IP: 172.x.x.2
+Port: 9000
 
-```text
-MariaDB image
-    |
-    v
-MariaDB container
-```
+Container B
+IP: 172.x.x.3
+Port: 9000
 
-The container has:
+Isso é possível porque os containers têm contextos de rede separados.
 
-* Its own filesystem.
-* Its own main process.
-* Its own environment variables.
-* Its own network interface.
-* Its own mounted volumes.
-* Its own runtime state.
+O WordPress tem a sua interface virtual ligada à Docker bridge. MariaDB tem outra. NGINX também tem outra.
+Docker configura a conectividade entre esses network namespaces.
 
-However, the container should be treated as temporary. A container can be deleted and recreated at any time.
+##### 2.1.3) Mount Namespace — isolamento de mounts
 
-If important data exists only inside the container, that data can be lost. That is why Inception uses volumes.
+Um mount namespace controla a visão que um processo tem dos mounts/filesystems.
+Isto ajuda a explicar porque dentro de um container podes ver:
 
-MariaDB data must not live only inside the MariaDB container.
-WordPress files must not live only inside the WordPress container.
+/
+├── bin
+├── etc
+├── usr
+├── var
+└── ...
 
-They must be stored in persistent volumes mapped to:
+e parece que tens um sistema de ficheiros próprio. Por exemplo, dentro de MariaDB, /var/lib/mysql pode 
+estar ligado a storage persistente. Enquanto no WordPress, /var/www/html está ligado a outro storage.
+Cada container pode ter uma visão diferente dos mounts:
 
-```text
-/home/rmedeiro/data/mariadb
-/home/rmedeiro/data/wordpress
-```
+MariaDB namespace
 
-The container can disappear. The data must remain.
+/
+├── etc
+├── usr
+└── var
+    └── lib
+        └── mysql  ← volume
 
----
+WordPress namespace
 
-# 6. What Is a Dockerfile?
+/
+├── etc
+├── usr
+└── var
+    └── www
+        └── html   ← volume
 
-A Dockerfile is a text file that contains instructions for building a Docker image.
+O mount namespace ajuda a fazer com que cada processo veja a sua própria organização de mounts.
 
-It tells Docker how to prepare the environment.
+------------------------------------------------------------------------------------------------------------
 
-Example:
+#### 2.2) Cgroups — controlo de recursos
 
-```dockerfile
-FROM debian:bookworm
+Namespaces respondem principalmente: O que posso ver?
 
-RUN apt-get update && apt-get install -y mariadb-server
+Cgroups respondem principalmente: Que recursos posso usar e como são controlados?
 
-COPY conf/50-server.cnf /etc/mysql/mariadb.conf.d/50-server.cnf
-COPY tools/init_mariadb.sh /bin/init_mariadb.sh
+cgroups significa control groups.
 
-RUN chmod +x /bin/init_mariadb.sh
+São uma funcionalidade do kernel Linux para organizar processos em grupos e controlar recursos.
 
-ENTRYPOINT ["/bin/init_mariadb.sh"]
-```
+Por exemplo:
 
-`FROM` defines the base image.
+Linux Kernel
+│
+├── Group A
+│   └── nginx
+│
+├── Group B
+│   └── php-fpm
+│
+└── Group C
+    └── mariadbd
 
-```dockerfile
-FROM debian:bookworm
-```
+O kernel consegue aplicar políticas de recursos aos diferentes grupos. Dependendo da configuração 
+e versão de cgroups, isto envolve recursos como:
 
-This means the image starts from Debian Bookworm.
+- CPU;
+- memória;
+- número de processos;
 
-`RUN` executes commands during the build.
+##### 2.2.1) Porque precisamos de cgroups?
 
-```dockerfile
-RUN apt-get update && apt-get install -y mariadb-server
-```
+Imagina que tens:
 
-This installs MariaDB inside the image.
+- NGINX
+- WordPress
+- MariaDB
 
-`COPY` copies files from the project into the image.
+e WordPress entra num comportamento anormal e começa a consumir recursos excessivamente.
+Sem mecanismos de controlo, um processo pode competir agressivamente pelos recursos disponíveis e afetar 
+os restantes serviços.
 
-```dockerfile
-COPY tools/init_mariadb.sh /bin/init_mariadb.sh
-```
+Conceptualmente:
 
-This places the initialization script inside the image.
+Total RAM
+████████████████████
 
-`ENTRYPOINT` defines the command that runs when the container starts.
+WordPress
+███████████████████
 
-```dockerfile
-ENTRYPOINT ["/bin/init_mariadb.sh"]
-```
+Everything else
+█
 
-This means that when the container starts, Docker executes the script.
+Com limites configurados através dos mecanismos apropriados de cgroups, podes restringir recursos.
+Por exemplo, conceptualmente:
 
-A Dockerfile does not run the final application immediately.
-It describes how to build the image that will later run the application.
+WordPress
+Maximum memory: 512 MB
 
----
+Então:
 
-# 7. Build Time vs Runtime
+               Host Resources
+                    │
+        ┌───────────┼───────────┐
+        │           │           │
+      NGINX      WordPress    MariaDB
+        │           │           │
+     cgroup       cgroup       cgroup
 
-This is one of the most important Docker concepts.
+O kernel consegue contabilizar e aplicar os limites/políticas definidos.
 
-There is a difference between what happens when the image is built and what happens when the container starts.
+Existir um cgroup não significa necessariamente que definiste um limite de 512 MB ou 1 CPU.
+Se não configurares limites específicos, o container pode continuar a competir por muitos dos recursos disponíveis.
+Ou seja, cgroups fornecem o mecanismo; as políticas/limites concretos dependem da configuração.
 
-## Build Time
+##### Qual é a diferença entre namespaces e cgroups?
 
-Build time happens when we run: ``docker compose build``
+Resposta: Namespaces são principalmente responsáveis pelo isolamento, ou seja, controlam a visão que os 
+          processos têm dos recursos do sistema. Cgroups são responsáveis pelo agrupamento, contabilização 
+		  e controlo de recursos consumidos pelos processos, como CPU e memória.
 
-At build time, Docker reads the Dockerfile and creates the image.
+---------------------------------------------------------------------------------------------------------------------
 
-Examples of build-time actions:
+--------------------------------------------------------------------------------------------------------------
 
-* Installing packages.
-* Copying configuration files.
-* Copying scripts.
-* Creating folders.
-* Setting permissions.
-* Preparing the base filesystem.
+#### Juntando tudo: como é criado o isolamento?
 
-Example: ``RUN apt-get install -y nginx`` happens during image creation.
+Agora imagina o teu container WordPress.
 
-## Runtime
+Tens:
 
-Runtime happens when we start a container.
+                WORDPRESS CONTAINER
+                        │
+        ┌───────────────┼────────────────┐
+        │               │                │
+        ▼               ▼                ▼
+   Namespaces        Cgroups         Filesystem
+        │               │                │
+        ▼               ▼                ▼
+ isolated view     resource control    isolated root
+        │                                │
+        ├─ PID                            └─ layers
+        ├─ network                             +
+        ├─ mounts                            volumes
+        ├─ hostname
+        └─ ...
 
-Example: ``docker compose up``
+O PHP-FPM continua a ser um processo Linux, mas os Namespaces fazem com que tenha uma visão isolada 
+do sistema.
+Cgroups permitem ao kernel organizar e limitar os recursos usados por esse processo/grupo.
+Filesystem/mounts fazem com que veja o ambiente de ficheiros construído a partir da image, juntamente 
+com os volumes que lhe foram montados.
 
-At runtime, the container starts its main process.
+Portanto, o processo sente que está num ambiente independente:
 
-Examples of runtime actions:
+"I have my own processes"
+"I have my own network"
+"I have my own hostname"
+"I have my own filesystem"
 
-* Reading secrets from `/run/secrets`.
-* Reading environment variables.
-* Starting MariaDB.
-* Starting PHP-FPM.
-* Starting Nginx.
-* Creating a database if it does not exist.
-* Installing WordPress if files are missing.
+Mas na realidade:
 
-This distinction matters a lot.
+                    SAME LINUX KERNEL
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+        nginx           php-fpm          mariadbd
+          │                │                │
+      container        container        container
+       isolation        isolation        isolation
 
-Passwords should not be copied into the image at build time.
+#### "Então o que cria um container?"
 
-Why?
+RESPOSTA: Um container não é uma máquina virtual nem tem necessariamente um kernel próprio. No Linux, é 
+um conjunto de processos normais isolados através de funcionalidades do kernel. Namespaces isolam a visão 
+que esses processos têm de recursos como PIDs, networking e mounts. Cgroups permitem agrupar e controlar 
+recursos como CPU e memória. Além disso, Docker fornece ao container um filesystem construído a partir 
+dos layers da image, com uma writable layer própria, e podemos montar volumes para dados que precisam de persistir.
 
-Because images can be inspected later.
-If a password is copied into an image, it may remain in the image layers.
-That is why secrets are read at runtime, not build time.
 
-Bad idea:
+## Porque precisamos do Docker? O que acrescenta e o que facilita?
 
-```dockerfile
-ENV MYSQL_PASSWORD=1234
-```
+O Docker permite criar, executar e gerir aplicações dentro de ambientes isolados (containers).
+No Inception, poderíamos teoricamente instalar o NGINX, MariaDB, WordPress, Redis, etc. diretamente na 
+máquina virtual. O problema é que todos esses serviços passariam a partilhar diretamente o mesmo sistema: 
+pacotes, configurações, processos e filesystem.
+Com Docker, conseguimos separar a infraestrutura em vários ambientes independentes:
 
-Better idea:
+VM
+│
+└── Docker
+    │
+    ├── Container NGINX
+    ├── Container WordPress
+    ├── Container MariaDB
+    ├── Container Redis
+    ├── Container Adminer
+    ├── Container FTP
+    ├── Container Static
+    └── Container Portainer
 
-```bash
-MYSQL_PASSWORD=$(cat /run/secrets/db_password)
-```
+Cada container tem o seu próprio filesystem, processos, configuração e dependências, embora os containers 
+partilhem o kernel da máquina host, que neste caso é a nossa VM.
 
-This reads the password only when the container starts.
+RESPOSTA FINAL: Usamos O Docker para isolar cada serviço da infraestrutura num container independente e tornar o ambiente 
+reproduzível e fácil de gerir. Cada serviço tem as suas próprias dependências e configuração, em vez de instalarmos tudo 
+diretamente na VM. Os containers são leves porque partilham o kernel do host e podem ser facilmente criados, removidos e 
+reconstruídos a partir das imagens. Docker também nos fornece networking entre containers e mecanismos de volumes para 
+separar os dados persistentes do ciclo de vida dos containers. No Inception, isto permite ter NGINX, WordPress, MariaDB, 
+Redis e os restantes serviços separados, mas a comunicar entre si através de uma Docker network. Depois usamos Docker 
+Compose para definir e gerir toda essa infraestrutura em conjunto.
 
----
-
-# 8. What Is Docker Compose?
-
-Running one container manually is easy.
-
-For example: ``docker run nginx``
-
-But Inception does not have only one container.
-It has several services:
-
-* Nginx.
-* WordPress.
-* MariaDB.
-
-Each service needs configuration.
-
-MariaDB needs:
-
-* A database volume.
-* Environment variables.
-* Secrets.
-* A network.
-
-WordPress needs:
-
-* Access to MariaDB.
-* WordPress files volume.
-* PHP-FPM.
-* Secrets.
-* Environment variables.
-
-Nginx needs:
-
-* Access to WordPress.
-* TLS configuration.
-* Port 443 exposed.
-
-Managing all of this manually with `docker run` commands would be difficult.
-Docker Compose solves this.
-
-Docker Compose allows us to define the whole infrastructure in one file: ``docker-compose.yml``
-
-Instead of writing many long commands, we write a structured configuration file.
-Then we can start everything with ``docker compose up``.
-
-Compose reads the file and creates:
-
-* Containers.
-* Networks.
-* Volumes.
-* Secret mounts.
-* Port mappings.
-* Service relationships.
-
-For Inception, Docker Compose is mandatory because the project is a multi-container infrastructure.
-
----
-
-# 9. What Is a Service in Docker Compose?
-
-In Docker Compose, a service is the definition of a container.
-
-Example:
-
-```yaml
-services:
-  mariadb:
-    build: ./requirements/mariadb
-    container_name: mariadb
-```
-
-Here, `mariadb` is a service.
-
-It tells Docker Compose:
-
-* How to build the image.
-* What container name to use.
-* Which volumes to mount.
-* Which networks to connect to.
-* Which secrets to provide.
-* Which environment variables to use.
-
-A service is not exactly the same thing as a container, but in Inception, each service normally creates one container.
-
-So we can think like this:
-
-```text
-Compose service definition → container created from that definition
-```
-
-Example:
-
-```yaml
-services:
-  nginx:
-    build: ./requirements/nginx
-    container_name: nginx
-```
-
-This defines the Nginx service.
-
-When we run ``docker compose up`` Compose creates the `nginx` container from this service definition.
-
----
-
-# 10. Why Inception Uses Three Containers
-
-Inception separates the infrastructure into multiple containers because each service has a different responsibility.
-
-## MariaDB Container
-
-MariaDB is responsible for storing data.
-
-WordPress stores posts, users, settings, comments, and metadata in MariaDB.
-
-MariaDB should not serve web pages.
-It should only manage the database.
-
-## WordPress Container
-
-
-The WordPress container usually runs PHP-FPM.
-
-PHP-FPM executes PHP code.
-
-WordPress itself is a PHP application, so when a request needs PHP processing, Nginx passes that request to PHP-FPM.
-
-The WordPress container should not expose HTTPS directly.
-It should focus on running PHP.
-
-## Nginx Container
-
-Nginx is the web server.
-
-It receives browser requests.
-
-It handles TLS.
-
-It serves static files when possible.
-
-It forwards PHP requests to WordPress/PHP-FPM.
-
-Nginx is the only service that should expose port `443` to the outside.
-
-This separation creates a clean architecture:
-
-```text
-Browser
-  -> Nginx
-  -> WordPress / PHP-FPM
-  -> MariaDB
-```
-
-Technically, this is a common web architecture:
-
-* Nginx handles HTTP/HTTPS.
-* PHP-FPM executes PHP.
-* MariaDB stores persistent data.
-
----
-
-# 11. What Is Nginx?
-
-Nginx is a web server.
-
-A web server receives requests from browsers and sends responses back.
-
-For example, when we open:
-
-```text
-https://rmedeiro.42.fr
-```
-
-the browser sends an HTTPS request.
-
-Nginx receives that request.
-
-Then Nginx decides what to do.
-
-If the request is for a static file, like an image or CSS file, Nginx can serve it directly.
-
-If the request needs PHP execution, Nginx forwards it to PHP-FPM in the WordPress container.
-
-Nginx does not execute PHP itself.
-That is why PHP-FPM is needed.
-
-In Inception, Nginx also handles TLS.
-This means Nginx is responsible for HTTPS encryption.
-The browser communicates securely with Nginx using TLS.
-
----
-
-# 12. What Is PHP-FPM?
-
-PHP-FPM means **PHP FastCGI Process Manager**.
-
-It is a service that runs PHP code.
-
-Nginx cannot execute PHP directly.
-So when Nginx receives a request for a PHP file, it sends that request to PHP-FPM.
-PHP-FPM executes the PHP code and returns the result to Nginx.
-Then Nginx sends the final response to the browser.
-
-For WordPress, this is essential because WordPress is written in PHP.
-The flow is:
-
-```text
-Browser asks for WordPress page
-Nginx receives request
-Nginx sends PHP request to PHP-FPM
-PHP-FPM executes WordPress code
-WordPress talks to MariaDB if needed
-PHP-FPM returns generated HTML
-Nginx sends HTML to browser
-```
-
-This is why the WordPress container usually runs PHP-FPM instead of Nginx.
-Nginx and PHP-FPM are separated into different containers.
-
----
-
-# 13. What Is MariaDB?
-
-
-MariaDB is a relational database management system.
-
-WordPress uses MariaDB to store most of its important information.
-
-Examples:
-
-* Users.
-* Password hashes.
-* Posts.
-* Pages.
-* Comments.
-* Site settings.
-* Plugin settings.
-* Theme settings.
-
-The database is not just optional.
-Without MariaDB, WordPress cannot work correctly.
-
-When WordPress starts, it needs database credentials:
-
-* Database host.
-* Database name.
-* Database user.
-* Database password.
-
-In Docker Compose, the database host is usually the service name: ``mariadb``
-
-This works because Docker networks provide internal DNS.
-So WordPress can connect to MariaDB using: ``mariadb:3306`` instead of using an IP address.
-
----
-
-# 14. What Are Docker Networks?
-
-Docker networks allow containers to communicate with each other.
-
-By default, containers are isolated.
-If WordPress needs to connect to MariaDB, both containers must be on the same Docker network.
-
-Docker Compose usually creates a network automatically.
-
-Example:
-
-```yaml
-networks:
-  inception:
-    driver: bridge
-```
-
-Then services can use it:
-
-```yaml
-services:
-  mariadb:
-    networks:
-      - inception
-
-  wordpress:
-    networks:
-      - inception
-
-  nginx:
-    networks:
-      - inception
-```
-
-When containers are on the same Compose network, they can reach each other by service name.
-That means WordPress can use: ``mariadb`` as the database host. Nginx can use: ``wordpress`` as the PHP-FPM host.
-
-This is better than using IP addresses because container IPs can change. Service names remain stable.
-
-Important idea:
-
-```text
-Inside Docker network:
-service name  =  hostname
-```
-
-So if the service is called `mariadb`, other containers can connect to `mariadb`.
-
----
-
-# 15. What Are Docker Volumes?
-
-Containers are temporary.
-
-If we delete a container, its internal filesystem is deleted too.
-
-This is dangerous for services that store data.
-
-MariaDB stores database files.
-WordPress stores website files.
-
-If those files exist only inside containers, deleting containers would delete the website.
-
-Volumes solve this problem.
-
-A volume stores data outside the container lifecycle.
-
-For Inception, the subject requires data under:
-
-```text
-/home/login/data
-```
-
-For this project:
-
-```text
-/home/rmedeiro/data
-```
-
-Usually:
-
-```text
-/home/rmedeiro/data/mariadb
-/home/rmedeiro/data/wordpress
-```
-
-MariaDB data is stored in:
-
-```text
-/home/rmedeiro/data/mariadb
-```
-
-WordPress files are stored in:
-
-```text
-/home/rmedeiro/data/wordpress
-```
-
-The containers can be destroyed and recreated, but the data remains.
-
-This is the difference:
-
-```text
-Container filesystem = temporary
-Volume data          = persistent
-```
-
-This is why volumes are one of the most important parts of Inception.
-
----
-
-# 16. Named Volumes vs Bind Mounts
-
-Docker supports different ways to store persistent data.
-
-Two important concepts are:
-
-* Named volumes.
-* Bind mounts.
-
-A named volume is managed by Docker.
-
-Example:
-
-```yaml
-volumes:
-  mariadb:
-```
-
-Docker decides where to store it internally.
-
-A bind mount maps a specific host directory into a container.
-
-Example:
-
-```yaml
-volumes:
-  mariadb:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /home/rmedeiro/data/mariadb
-```
-
-In this case, Docker uses the real host path:
-
-```text
-/home/rmedeiro/data/mariadb
-```
-
-This is important for Inception because the subject expects persistent data under `/home/login/data`.
-
-So even if we declare a named volume called `mariadb`, we configure it as a bind mount to the required host directory.
-
-The result is:
-
-```text
-Docker volume name: mariadb
-Real location:     /home/rmedeiro/data/mariadb
-```
-
-This satisfies the idea of Docker volumes while storing data in the required path.
-
----
-
-# 17. What Is TLS?
-
-TLS is the protocol used to encrypt HTTPS traffic.
-
-When a website uses:
-
-```text
-https://
-```
-
-the connection is encrypted with TLS.
-
-In Inception, Nginx must serve the website using HTTPS.
-
-This means Nginx needs:
-
-* A certificate.
-* A private key.
-* TLS configuration.
-
-Usually, for a local project, we use a self-signed certificate.
-
-A self-signed certificate is not trusted by browsers by default, because it was not issued by a public certificate authority.
-
-The browser may show a warning.
-
-That is normal for this project.
-
-The important part is that the connection uses TLS.
-
-In the Nginx configuration, we usually allow:
-
-```nginx
-ssl_protocols TLSv1.2 TLSv1.3;
-```
-
-This means only TLS 1.2 and TLS 1.3 are accepted.
-
-Older protocols such as SSLv3, TLS 1.0, and TLS 1.1 should not be used.
-
----
-
-# 18. What Is Port Mapping?
-
-Containers have their own internal network.
-
-A service inside a container can listen on a port, but that does not automatically expose it to the host machine.
-
-Port mapping connects a port on the host to a port inside the container.
-
-For Inception, Nginx should expose port `443`.
-
-Example:
-
-```yaml
-ports:
-  - "443:443"
-```
-
-This means:
-
-```text
-Host port 443 -> Container port 443
-```
-
-So when the browser accesses:
-
-```text
-https://rmedeiro.42.fr
-```
-
-the request reaches port `443` on the host, and Docker forwards it to port `443` inside the Nginx container.
-
-MariaDB should not expose port `3306` to the outside.
-
-WordPress/PHP-FPM should not expose port `9000` to the outside.
-
-They only need to communicate internally through the Docker network.
-
-That is an important security and architecture concept.
-
-Only Nginx should be public.
-
----
-
-# 22. What Is `depends_on`?
-
-In Docker Compose, `depends_on` defines startup order.
-
-Example:
-
-```yaml
-services:
-  wordpress:
-    depends_on:
-      - mariadb
-```
-
-This means Docker Compose starts MariaDB before WordPress.
-
-However, this does not guarantee that MariaDB is fully ready to accept connections.
-
-It only means the MariaDB container was started first.
-
-That is why WordPress startup scripts often need to wait until MariaDB is actually ready.
-
-For example, the script may retry connecting to MariaDB before installing WordPress.
-
-Important distinction:
-
-```text
-Container started ≠ service ready
-```
-
-MariaDB may be started but still initializing.
-
-So `depends_on` is useful, but it is not a complete readiness check.
-
----
-
-# 23. What Is a Restart Policy?
-
-A restart policy tells Docker what to do if a container stops.
-
-Example:
-
-```yaml
-restart: always
-```
-
-This means Docker should restart the container if it crashes or if the Docker daemon restarts.
-
-For Inception, this is useful because services should recover automatically.
-
-Common policies:
-
-| Policy           | Meaning                                           |
-| ---------------- | ------------------------------------------------- |
-| `no`             | Do not restart automatically                      |
-| `always`         | Always restart the container                      |
-| `on-failure`     | Restart only if the container exits with an error |
-| `unless-stopped` | Restart unless the user manually stopped it       |
-
-For Inception, many students use:
-
-```yaml
-restart: always
-```
-
-This helps ensure that services remain running after failures or VM restarts.
-
----
-
-# 24. How the Whole Inception Stack Works
-
-When everything is correctly configured, the project works like this.
-
-The browser opens:
-
-```text
-https://rmedeiro.42.fr
-```
-
-The system checks `/etc/hosts` and resolves the domain to:
-
-```text
-127.0.0.1
-```
-
-The request reaches the Debian VM on port `443`.
-
-Docker forwards port `443` to the Nginx container.
-
-Nginx receives the HTTPS request.
-
-If the request needs PHP, Nginx forwards it to PHP-FPM in the WordPress container.
-
-WordPress executes PHP code.
-
-If WordPress needs data, it connects to MariaDB using the hostname:
-
-```text
-mariadb
-```
-
-MariaDB reads or writes data in its persistent volume.
-
-The response travels back:
-
-```text
-MariaDB -> WordPress/PHP-FPM -> Nginx -> Browser
-```
-
-The user sees the WordPress page.
-
-This is the final goal of Inception.
-
----
